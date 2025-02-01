@@ -25,10 +25,12 @@ torch.backends.cudnn.allow_tf32 = True
 torch.use_deterministic_algorithms(True, warn_only=True)
 
 class D3NavTrainingModule(pl.LightningModule):
-    def __init__(self, model):
+    def __init__(self,):
         super().__init__()
-        self.model = model
+        self.model = D3Nav().to(dtype=DEFAULT_DATATYPE)
         self.metric = PlanningMetric()
+
+        self.model.freeze_traj_enc_dec(requires_grad=True)
 
     def forward(self, y):
         return self.model.traj_quantize(y)
@@ -160,12 +162,16 @@ def main():
         prefetch_factor=2,
     )
 
-    # Initialize model
-    model = D3Nav().to(dtype=DEFAULT_DATATYPE)
-    model.freeze_traj_enc_dec(requires_grad=True)
+    # ckpt = None
+    ckpt = "checkpoints/traj_quantizer/d3nav-traj-epoch-42-val_loss-1.3925.ckpt"
 
-    # Initialize training module
-    training_module = D3NavTrainingModule(model)
+    if ckpt is None:
+        # Initialize training module
+        training_module = D3NavTrainingModule()
+    else:
+        training_module = D3NavTrainingModule.load_from_checkpoint(
+            ckpt
+        )
 
     # Initialize logger
     logger = WandbLogger(project="D3Nav-NuScenes-Traj")
@@ -191,7 +197,11 @@ def main():
     )
 
     # Train the model
-    trainer.fit(training_module, train_loader, val_loader)
+    trainer.fit(
+        training_module,
+        train_loader,
+        val_loader,
+    )
 
 
 if __name__ == "__main__":

@@ -87,7 +87,6 @@ class D3Nav(BaseModel):
 
     def __init__(
         self,
-        unfreeze_last_n_layers=0,
     ):
         super(D3Nav, self).__init__()
 
@@ -132,28 +131,26 @@ class D3Nav(BaseModel):
         self.freeze_gpt()
         self.freeze_traj_enc_dec()
 
-        # LORA
-        if unfreeze_last_n_layers > 0:
-            self.unfreeze_last_n_layers(num_layers=unfreeze_last_n_layers)
-
     def unfreeze_last_n_layers(self, num_layers):
         """
         unfreeze last few lawers
         """
-        # First freeze the entire model
-        self.freeze_gpt(requires_grad=False)
-
         # Get total number of layers
         total_layers = len(self.model.transformer.h)
 
         # Calculate which layers to apply LORA to (from the end)
         start_layer = total_layers - num_layers
 
-        # Initialize LORA weights for selected layers
+        # Initialize for selected layers
         for i in range(total_layers - num_layers, total_layers):
             layer = self.model.transformer.h[i]
+            for param in layer.parameters():
+                param.requires_grad = True
 
-            layer.requires_grad = True
+        
+        for param in self.model.lm_head.parameters():
+            param.requires_grad = True
+
 
     def freeze_vqvae(self, requires_grad=False):
         for param in self.encoder.parameters():
@@ -194,6 +191,138 @@ class D3Nav(BaseModel):
         """
         Takes a video context as input
         Encodes it into token space
+        Generates one token
+        Decodes the trajectory
+        """
+
+        print('x', x.shape)
+
+        B, T, C, H, W = x.shape
+        # assert T == self.T
+        x = x.reshape(B * T, C, H, W)
+        print('x', x.shape, x.dtype, x.grad_fn)  # grad_fn is None
+
+        # z: torch.Tensor = self.encoder(x)
+        z, z_history_feats = self.encoder(x, return_feats=True)
+        z_history_feats = z_history_feats.reshape(B, T, 256, 8, 16)
+
+        print('z_history_feats', z_history_feats.shape, z_history_feats.dtype, z_history_feats.grad_fn)  # grad_fn is None
+        print('z', z.shape, z.dtype, z.grad_fn, z.requires_grad)  # grad_fn is None
+
+        # First straight-through point
+        # z_hard = z.to(dtype=torch.int32)
+        # z = z_hard.to(dtype=torch.float32)
+        # z_hard = z_hard + (z_hard - z).detach()  # straight-through
+        # z = z_hard.reshape(B, T, -1)
+        
+        z = z.reshape(B, T, -1)
+
+        # Create BOS tokens
+        bos_tokens = torch.full(
+            (B, T, 1),
+            self.config_gpt.bos_token,
+            dtype=z.dtype,
+            device=z.device,
+        )
+
+        # Concatenate BOS tokens with z
+        z = torch.cat([bos_tokens, z], dim=2)
+        print('z', z.shape, z.dtype, z.grad_fn)  # grad_fn is None
+
+        zp_l = []
+        for index in range(B):
+            zp_i = self.differentiable_generate(
+                z[index].reshape(T * self.config_gpt.tokens_per_frame),
+                self.config_gpt.tokens_per_frame,
+            )
+            print('zp_i', zp_i.shape, zp_i.grad_fn)  # grad_fn is None
+
+            zp_l.append(zp_i)
+        zp: torch.Tensor = torch.stack(zp_l)
+        zp = zp.reshape(B, self.config_gpt.tokens_per_frame, self.config_gpt.dim)
+
+        print('zp', zp.shape, zp.dtype, zp.grad_fn)  # grad_fn is None
+
+        # Second straight-through point
+        zp = zp[:, 1:]
+        # zp_hard = zp.to(dtype=torch.int64)
+        # # zp = zp_hard.to(dtype=torch.float32)
+        # zp = zp_hard + (zp_hard - zp).detach()  # straight-through
+        print('zp', zp.shape, zp.dtype, zp.grad_fn)  # grad_fn is None
+
+        # xp, z_feat = self.decoder(zp, return_feats=True)
+        # xp = xp.reshape(B, 1, C, H, W)
+        planner_features = zp.reshape(B, 1 * 8 * 16, 1024)
+        planner_features = planner_features[:, -1:, :]  # Last token
+
+        # During training, we can use the actual trajectory
+        decoded_traj = self.traj_decoder(planner_features)
+        # ego_trajectory = decoded_traj.permute(0, 1, 3, 4, 2)  # Adjusting dimensions
+        ego_trajectory = decoded_traj
+
+        return ego_trajectory
+
+    def differentiable_generate(self, prompt: torch.Tensor, max_new_tokens: int, temperature: float = 1.0) -> torch.Tensor:
+        """Differentiable version of generate using straight-through estimator"""
+        t = prompt.size(0)
+        device = prompt.device
+        
+        # Get initial logits
+        input_pos = torch.arange(0, t, device=device)
+        logits = self.model(prompt.view(1, -1), input_pos)
+
+        print('prompt', prompt.shape, prompt.dtype, prompt.grad_fn)
+        print('logits', logits.shape, logits.dtype, logits.grad_fn)
+        
+        # Use softmax for probabilities
+        probs = F.softmax(logits[0, -1] / temperature, dim=-1)
+        
+        # Sample discrete tokens
+        next_token = torch.multinomial(probs, 1)
+        
+        # Get token embeddings
+        next_token_embedding = self.model.transformer.wte(next_token)
+
+        next_token_embedding.requires_grad = True
+        
+        # Apply straight-through estimator
+        soft_probs = probs.unsqueeze(0)  # [1, vocab_size]
+        soft_embedding = torch.matmul(soft_probs, self.model.transformer.wte.weight)  # [1, dim]
+        next_token_embedding = next_token_embedding + (soft_embedding - next_token_embedding).detach()
+
+        print('next_token_embedding', next_token_embedding.shape, next_token_embedding.dtype, next_token_embedding.grad_fn)
+        
+        generated_tokens = [next_token]
+        generated_tokens_embedding = [next_token_embedding]
+        
+        # Generate remaining tokens
+        for pos in range(t, t + max_new_tokens - 1):
+            input_pos = torch.tensor([pos], device=device)
+            logits = self.model(next_token.view(1, -1), input_pos)
+            probs = F.softmax(logits[0, -1] / temperature, dim=-1)
+            
+            # Sample discrete token
+            next_token = torch.multinomial(probs, 1)
+            
+            # Get token embeddings with straight-through estimator
+            next_token_embedding = self.model.transformer.wte(next_token)
+            soft_probs = probs.unsqueeze(0)
+            soft_embedding = torch.matmul(soft_probs, self.model.transformer.wte.weight)
+            next_token_embedding = next_token_embedding + (soft_embedding - next_token_embedding).detach()
+            
+            generated_tokens.append(next_token)
+            generated_tokens_embedding.append(next_token_embedding)
+        
+        generated_tokens = torch.cat(generated_tokens, dim=0)
+        generated_tokens_embedding = torch.cat(generated_tokens_embedding, dim=0)
+        print('generated_tokens', generated_tokens.shape, generated_tokens.dtype, generated_tokens.grad_fn)
+        print('generated_tokens_embedding', generated_tokens_embedding.shape, generated_tokens_embedding.dtype, generated_tokens_embedding.grad_fn)
+        return generated_tokens_embedding
+
+    def forward_video(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Takes a video context as input
+        Encodes it into token space
         Autoregresively generates the next frame
         Decodes the frame
         """
@@ -231,18 +360,12 @@ class D3Nav(BaseModel):
 
         zp = zp[:, 1:]
         zp = zp.to(dtype=torch.int64)
+        # TODO: straight through
 
         xp, z_feat = self.decoder(zp, return_feats=True)
         xp = xp.reshape(B, 1, C, H, W)
-        planner_features = z_feat.reshape(B, 1 * 8 * 16, 256)
-        planner_features = planner_features[:, -1:, :]  # Last token
 
-        # During training, we can use the actual trajectory
-        decoded_traj = self.traj_decoder(planner_features)
-        # ego_trajectory = decoded_traj.permute(0, 1, 3, 4, 2)  # Adjusting dimensions
-        ego_trajectory = decoded_traj
-
-        return xp, ego_trajectory
+        return xp
 
 
 def find_multiple(n: int, k: int) -> int:
@@ -472,7 +595,6 @@ class GPT(nn.Module):
             cur_token = next_token.view(1, -1)
         return new_tokens, new_probs
 
-    @torch.no_grad()
     def generate(
         self, prompt: torch.Tensor, max_new_tokens: int
     ) -> torch.Tensor:
@@ -480,6 +602,8 @@ class GPT(nn.Module):
         T_new = t + max_new_tokens
         max_seq_length = self.config.block_size
         device, dtype = prompt.device, prompt.dtype
+
+        print('generate prompt', prompt.shape)
 
         with torch.device(device):
             self.setup_caches(max_batch_size=1, max_seq_length=max_seq_length)
@@ -740,6 +864,10 @@ class VectorQuantizer(nn.Module):
         encoding_indices = rearrange(
             encoding_indices, "(b s) 1 -> b s", b=b, s=s
         )
+        quantized = inputs + (quantized - inputs).detach()
+        print('vq quantized', quantized.shape, quantized.dtype, quantized.grad_fn)
+        print('vq inputs', inputs.shape, inputs.dtype, inputs.grad_fn)
+        print('vq encoding_indices', encoding_indices.shape, encoding_indices.dtype, encoding_indices.grad_fn)
         return quantized, encoding_indices
 
     # the decode function
@@ -874,6 +1002,8 @@ class Encoder(nn.Module):
         h_feats = self.quant_conv(h)
         h = rearrange(h_feats, "b c h w -> b (h w) c")
         _, encoding_indices = self.quantize(h)
+        print('enc h_feats', h_feats.shape, h_feats.dtype, h_feats.grad_fn)
+        print('enc encoding_indices', encoding_indices.shape, encoding_indices.dtype, encoding_indices.grad_fn)
 
         if return_feats:
             return encoding_indices, h_feats
@@ -1071,3 +1201,22 @@ def to_cv2_frame(img_torch: torch.Tensor) -> np.ndarray:
     img_np = img_np.astype(np.uint8)
 
     return img_np
+
+
+if __name__ == "__main__":
+    import torch
+
+    B, T, C, H, W = 1, 8, 3, 128, 256
+
+    x = torch.zeros((B, T, C, H, W), requires_grad=True)  # Add requires_grad=True
+    model = D3Nav()
+    model.unfreeze_last_n_layers(num_layers=3)
+
+    traj = model(x)
+    
+    # Test gradient flow
+    loss = traj.sum()
+    loss.backward()
+    
+    print('x.grad is None:', x.grad is None)
+    print('traj grad_fn:', traj.grad_fn)

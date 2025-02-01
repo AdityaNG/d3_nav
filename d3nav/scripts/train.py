@@ -25,18 +25,23 @@ torch.backends.cudnn.allow_tf32 = True
 torch.use_deterministic_algorithms(True, warn_only=True)
 
 class D3NavTrainingModule(pl.LightningModule):
-    def __init__(self, model):
+    def __init__(self):
         super().__init__()
-        self.model = model
+        self.model = D3Nav()
         self.metric = PlanningMetric()
+
+        self.model.unfreeze_last_n_layers(
+            num_layers=3
+        )
 
     def forward(self, x):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        _, pred_trajectory = self(x)
+        pred_trajectory = self(x)
         loss = torch.nn.functional.l1_loss(pred_trajectory, y)
+        print('loss', loss.grad_fn)
         self.log("train_loss", loss)
         return loss
 
@@ -49,7 +54,7 @@ class D3NavTrainingModule(pl.LightningModule):
 
         batch_size = x.shape[0]
 
-        _, pred_trajectory = self(x)
+        pred_trajectory = self(x)
         loss = torch.nn.functional.l1_loss(pred_trajectory, y)
         self.log("val_loss", loss)
 
@@ -137,7 +142,7 @@ def main():
     train_dataset = NuScenesDataset(nusc, is_train=True)
     val_dataset = NuScenesDataset(nusc, is_train=False)
 
-    batch_size = 6
+    batch_size = 8
 
     train_loader = DataLoader(
         train_dataset,
@@ -160,11 +165,16 @@ def main():
         prefetch_factor=2,
     )
 
-    # Initialize model
-    model = D3Nav(unfreeze_last_n_layers=6).to(dtype=DEFAULT_DATATYPE)
+    # ckpt = None
+    ckpt = "checkpoints/traj_quantizer/d3nav-traj-epoch-132-val_loss-0.2792.ckpt"
 
-    # Initialize training module
-    training_module = D3NavTrainingModule(model)
+    if ckpt is None:
+        # Initialize training module
+        training_module = D3NavTrainingModule()
+    else:
+        training_module = D3NavTrainingModule.load_from_checkpoint(
+            ckpt
+        )
 
     # Initialize logger
     logger = WandbLogger(project="D3Nav-NuScenes")
@@ -181,16 +191,20 @@ def main():
 
     # Initialize trainer
     trainer = pl.Trainer(
-        max_epochs=200,
+        max_epochs=30,
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
         devices=1,
         logger=logger,
         callbacks=[checkpoint_callback],
-        precision="bf16-mixed",  # Use bfloat16 mixed precision
+        precision="bf16-mixed",
     )
 
     # Train the model
-    trainer.fit(training_module, train_loader, val_loader)
+    trainer.fit(
+        training_module,
+        train_loader,
+        val_loader,
+    )
 
 
 if __name__ == "__main__":

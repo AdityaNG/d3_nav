@@ -47,45 +47,37 @@ Cite our work if you find it useful
 pip install d3nav
 ```
 
-You can run the CommaVQ dataset based video demo as follows
+You can run the video demo as follows
 ```bash
+# TODO:
 python3 -m d3nav --video_path input_video.mp4
 ```
 
 ## Usage
 
 ```py
-from d3nav.model import d3nav
+from d3nav.model import D3Nav
 
 # Load the model
-net = d3nav()
+net = D3Nav()
 net.load_state_dict(torch.load(d3nav_path))
 net.eval()
-
-# Dummy input
-video_input = torch.zeros(
-    (1, num_frames, 3, video_shape[0], video_shape[1]), dtype=torch.float32
-)
-
-# Move to device
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = net.to(device=device)
-video_input = video_input.to(device=device)
-
-# Forward pass
-y_pred = net(video_input)
-output_video = y_pred["future_frames"]
 ```
 
 You can train on the comma dataset using the following script
 ```bash
-python3 -m d3nav.scripts.train_GPT_comma
+# Train the VQ-VAE for trajectory encoding
+python3 -m d3nav.scripts.train_traj
+
+# Fine tune the video model for trajectory prediction
+python3 -m d3nav.scripts.train
 ```
 
 ## Model Predictive Control
 
 Checkout our [Model Predictive Controller](https://github.com/AdityaNG/model_predictive_control) for computing steering angle and acceleration.
 ```py
+# TODO: implement MPC to show steering
 # pip install model_predictive_control
 
 import numpy as np
