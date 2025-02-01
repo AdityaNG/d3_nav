@@ -41,7 +41,6 @@ class D3NavTrainingModule(pl.LightningModule):
         x, y = batch
         pred_trajectory = self(x)
         loss = torch.nn.functional.l1_loss(pred_trajectory, y)
-        print('loss', loss.grad_fn)
         self.log("train_loss", loss)
         return loss
 
@@ -142,7 +141,7 @@ def main():
     train_dataset = NuScenesDataset(nusc, is_train=True)
     val_dataset = NuScenesDataset(nusc, is_train=False)
 
-    batch_size = 8
+    batch_size = 12
 
     train_loader = DataLoader(
         train_dataset,
@@ -193,7 +192,7 @@ def main():
     trainer = pl.Trainer(
         max_epochs=30,
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
-        devices=1,
+        devices=2,
         logger=logger,
         callbacks=[checkpoint_callback],
         precision="bf16-mixed",
