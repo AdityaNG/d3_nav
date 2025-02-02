@@ -1,5 +1,7 @@
+# NCCL_P2P_LEVEL=NVL CUBLAS_WORKSPACE_CONFIG=:16:8 nohup python3 -m d3nav.scripts.train &
 import os
 import random
+import math
 
 import cv2
 import numpy as np
@@ -14,6 +16,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import default_collate
+from torch.optim import Adam
+from torch.optim.lr_scheduler import LambdaLR
 
 from d3nav.datasets.nusc import NuScenesDataset
 from d3nav.metric_stp3 import PlanningMetric
@@ -108,8 +112,30 @@ class D3NavTrainingModule(pl.LightningModule):
         #     })
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-3)
-
+        optimizer = Adam(self.parameters(), lr=1e-4)
+        
+        # Warmup parameters
+        num_warmup_steps = 200  # Typically 5-10% of total steps
+        num_training_steps = 2200  # From your graphs, total training steps
+        
+        def lr_lambda(current_step: int):
+            # Linear warmup
+            if current_step < num_warmup_steps:
+                return float(current_step) / float(max(1, num_warmup_steps))
+            # Cosine decay after warmup
+            progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
+            return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
+        
+        scheduler = LambdaLR(optimizer, lr_lambda)
+        
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",  # Update at each step rather than epoch
+                "frequency": 1
+            }
+        }
 
 def custom_collate(batch):
     x = []
@@ -196,6 +222,9 @@ def main():
         logger=logger,
         callbacks=[checkpoint_callback],
         precision="bf16-mixed",
+        num_sanity_val_steps=4,
+        strategy="ddp",  # distributed strategy
+        sync_batchnorm=True,  # Synchronize batch normalization between processes
     )
 
     # Train the model
