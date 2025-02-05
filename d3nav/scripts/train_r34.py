@@ -1,4 +1,5 @@
-# NCCL_DEBUG=INFO NCCL_P2P_LEVEL=NVL CUBLAS_WORKSPACE_CONFIG=:16:8 nohup python3 -m d3nav.scripts.train &
+# NCCL_DEBUG=INFO NCCL_P2P_LEVEL=NVL CUBLAS_WORKSPACE_CONFIG=:16:8 nohup python3 -m d3nav.scripts.train_r34 &
+
 import os
 import random
 import math
@@ -7,6 +8,7 @@ import cv2
 import numpy as np
 import lightning.pytorch as pl
 import torch
+import torchvision.models as models
 from nuscenes.eval.prediction.splits import get_prediction_challenge_split
 from nuscenes.nuscenes import NuScenes
 from nuscenes.prediction import PredictHelper
@@ -21,7 +23,6 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from d3nav.datasets.nusc import NuScenesDataset
 from d3nav.metric_stp3 import PlanningMetric
-from d3nav.model.d3nav import DEFAULT_DATATYPE, D3Nav, transform_img
 
 torch.set_float32_matmul_precision("medium")
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -40,18 +41,40 @@ assert accumulate_grad_batches * batch_size_per_device * num_devices == effectiv
 
 learning_rate = 5e-5 * math.sqrt(effective_batch_size/24)
 
-num_layers = 3
-
-class D3NavTrainingModule(pl.LightningModule):
+class ResNet34Trajectory(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.model = D3Nav()
-        self.metric = PlanningMetric()
-
-        self.model.unfreeze_last_n_layers(
-            num_layers=num_layers
+        # Load pretrained ResNet34
+        resnet = models.resnet34(pretrained=True)
+        
+        # Remove the last layer
+        self.features = torch.nn.Sequential(*list(resnet.children())[:-1])
+        
+        # Add new layers for trajectory prediction
+        # Output shape should be (batch_size, 6, 2) for 3 seconds of trajectory with 2D coordinates
+        self.trajectory_head = torch.nn.Sequential(
+            torch.nn.Linear(512, 256),
+            torch.nn.ReLU(),
+            torch.nn.Linear(256, 12),  # 6 points * 2 coordinates
         )
-        self.clip_grad_norm = 1.0  # Standard value, adjust if needed
+
+    def forward(self, x):
+        # Expected input: (batch_size, time, channels, height, width)
+
+        x = x[:,0,:,:,:]
+        # x: (batch_size, channels, height, width)
+        features = self.features(x)
+        features = torch.flatten(features, 1)
+        trajectory = self.trajectory_head(features)
+        # Reshape to (batch_size, 6, 2) for trajectory coordinates
+        return trajectory.view(-1, 6, 2)
+
+class ResNet34TrainingModule(pl.LightningModule):
+    def __init__(self):
+        super().__init__()
+        self.model = ResNet34Trajectory()
+        self.metric = PlanningMetric()
+        self.clip_grad_norm = 1.0
 
     def forward(self, x):
         return self.model(x)
@@ -59,12 +82,12 @@ class D3NavTrainingModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         pred_trajectory = self(x)
-        loss = torch.nn.functional.l1_loss(pred_trajectory, y)
+        loss = torch.nn.functional.l1_loss(pred_trajectory, y[..., :2])  # Only use x,y coordinates
         lrs = self.scheduler.get_last_lr()
 
         if batch_idx % 10 == 0:
-            self.log("train_loss", loss, )
-            self.log("learning_rate", sum(lrs) / float(len(lrs)), )
+            self.log("train_loss", loss)
+            self.log("learning_rate", sum(lrs) / float(len(lrs)))
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -75,10 +98,9 @@ class D3NavTrainingModule(pl.LightningModule):
             bboxes = None
 
         batch_size = x.shape[0]
-
         pred_trajectory = self(x)
-        loss = torch.nn.functional.l1_loss(pred_trajectory, y)
-        self.log("val_loss", loss, )
+        loss = torch.nn.functional.l1_loss(pred_trajectory, y[..., :2])  # Only use x,y coordinates
+        self.log("val_loss", loss)
 
         l2_1s_l = []
         l2_2s_l = []
@@ -87,13 +109,13 @@ class D3NavTrainingModule(pl.LightningModule):
         # Calculate metrics
         for batch_index in range(batch_size):
             l2_1s = self.metric.compute_L2(
-                pred_trajectory[batch_index, :2, :2], y[batch_index, :2, :2]
+                pred_trajectory[batch_index, :2], y[batch_index, :2, :2]
             )
             l2_2s = self.metric.compute_L2(
-                pred_trajectory[batch_index, :4, :2], y[batch_index, :4, :2]
+                pred_trajectory[batch_index, :4], y[batch_index, :4, :2]
             )
             l2_3s = self.metric.compute_L2(
-                pred_trajectory[batch_index, :, :2], y[batch_index, :, :2]
+                pred_trajectory[batch_index], y[batch_index, :, :2]
             )
 
             l2_1s_l += [l2_1s]
@@ -110,26 +132,7 @@ class D3NavTrainingModule(pl.LightningModule):
                 "val_l2_2s": l2_2s,
                 "val_l2_3s": l2_3s,
             },
-            
         )
-
-        # TODO: fix this
-        # if bboxes is not None:
-
-        #     segmentation, pedestrian = self.planning_metric.get_label(
-        #         bboxes, bboxes)
-        #     occupancy = torch.logical_or(segmentation, pedestrian)
-
-        #     obj_coll_sum, obj_box_coll_sum = self.metric.evaluate_coll(pred_trajectory[:, :, :2], y[:, :, :2], bboxes)
-        #     col_1s = obj_box_coll_sum[:2].sum() / (2 * len(batch))
-        #     col_2s = obj_box_coll_sum[:4].sum() / (4 * len(batch))
-        #     col_3s = obj_box_coll_sum.sum() / (6 * len(batch))
-
-        #     self.log_dict({
-        #         'val_col_1s': col_1s,
-        #         'val_col_2s': col_2s,
-        #         'val_col_3s': col_3s,
-        #     })
 
     def on_before_optimizer_step(self, optimizer):
         torch.nn.utils.clip_grad_norm_(self.parameters(), self.clip_grad_norm)
@@ -178,16 +181,14 @@ def custom_collate(batch):
         return x, y, bboxes
     return x, y
 
-
 def main():
-    # Initialize NuScenes
+    # ... existing code ...
     nusc = NuScenes(
         version="v1.0-trainval",
         dataroot="/media/NG/datasets/nuscenes/",
         verbose=True,
     )
 
-    # Create datasets and dataloaders
     train_dataset = NuScenesDataset(nusc, is_train=True)
     val_dataset = NuScenesDataset(nusc, is_train=False)
 
@@ -212,32 +213,22 @@ def main():
         prefetch_factor=2,
     )
 
-    # ckpt = None
-    # ckpt = "checkpoints/traj_quantizer/d3nav-traj-epoch-132-val_loss-0.2792.ckpt"
-    ckpt = "checkpoints/d3nav/d3nav-epoch-06-val_loss-0.6668.ckpt"
-
-    if ckpt is None:
-        # Initialize training module
-        training_module = D3NavTrainingModule()
-    else:
-        training_module = D3NavTrainingModule.load_from_checkpoint(
-            ckpt
-        )
+    # Initialize training module
+    training_module = ResNet34TrainingModule()
 
     # Initialize logger
-    logger = WandbLogger(project="D3Nav-NuScenes")
+    logger = WandbLogger(project="ResNet34-NuScenes-Baseline")
 
     # Initialize checkpoint callback
     checkpoint_callback = ModelCheckpoint(
         monitor="val_loss",
         mode="min",
-        save_top_k=-1,  # Save all checkpoints
-        filename="d3nav-{epoch:02d}-{val_loss:.4f}",
-        every_n_epochs=1,  # Save every epoch
+        save_top_k=-1,
+        filename="resnet34-{epoch:02d}-{val_loss:.4f}",
+        every_n_epochs=1,
         dirpath="wandb/latest-run/checkpoints",
     )
 
-    # Initialize trainer
     trainer = pl.Trainer(
         max_epochs=30,
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
@@ -248,17 +239,15 @@ def main():
         callbacks=[checkpoint_callback,],
         precision="bf16-mixed",
         num_sanity_val_steps=1,
-        strategy="ddp",  # distributed strategy
-        sync_batchnorm=True,  # Synchronize batch normalization between processes
+        strategy="ddp",
+        sync_batchnorm=True,
     )
 
-    # Train the model
     trainer.fit(
         training_module,
         train_loader,
         val_loader,
     )
-
 
 if __name__ == "__main__":
     main()

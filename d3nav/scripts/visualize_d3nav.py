@@ -30,7 +30,7 @@ def get_camera_intrinsic(nusc, camera_channel='CAM_FRONT'):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ckpt', type=str, required=True, help='Path to checkpoint')
+    parser.add_argument('--ckpt', type=str, default='checkpoints/d3nav/d3nav-epoch-06-val_loss-0.6668.ckpt', help='Path to checkpoint')
     args = parser.parse_args()
 
     # Create output directory if it doesn't exist

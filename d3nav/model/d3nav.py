@@ -225,12 +225,9 @@ class D3Nav(BaseModel):
 
             zp_l.append(zp_i)
         zp: torch.Tensor = torch.stack(zp_l)
-        zp = zp.reshape(B, self.config_gpt.tokens_per_frame, self.config_gpt.dim)
+        zp = zp.reshape(B, self.config_gpt.dim + 1)
 
-        # Second straight-through point
-        zp = zp[:, 1:]
-        planner_features = zp.reshape(B, 1 * 8 * 16, 1024)
-        planner_features = planner_features[:, -1:, :]  # Last token
+        planner_features = zp.reshape(B, 1, 1025)
 
         # During training, we can use the actual trajectory
         decoded_traj = self.traj_decoder(planner_features)
@@ -239,54 +236,18 @@ class D3Nav(BaseModel):
         return ego_trajectory
 
     def differentiable_generate(self, prompt: torch.Tensor, max_new_tokens: int, temperature: float = 1.0) -> torch.Tensor:
-        """Differentiable version of generate using straight-through estimator"""
+        """Single forward pass to get transformer features for trajectory decoder"""
         t = prompt.size(0)
         device = prompt.device
         
-        # Get initial logits
+        # Single forward pass through transformer
         input_pos = torch.arange(0, t, device=device)
-        logits = self.model(prompt.view(1, -1), input_pos)
-
-        # Use softmax for probabilities
-        probs = F.softmax(logits[0, -1] / temperature, dim=-1)
+        transformer_output = self.model(prompt.view(1, -1), input_pos)
         
-        # Sample discrete tokens
-        next_token = torch.multinomial(probs, 1)
+        # Return the features for the last token
+        last_token_features = transformer_output[0, -1]  # Shape: [dim]
         
-        # Get token embeddings
-        next_token_embedding = self.model.transformer.wte(next_token)
-
-        next_token_embedding.requires_grad = True
-        
-        # Apply straight-through estimator
-        soft_probs = probs.unsqueeze(0)  # [1, vocab_size]
-        soft_embedding = torch.matmul(soft_probs, self.model.transformer.wte.weight)  # [1, dim]
-        next_token_embedding = next_token_embedding + (soft_embedding - next_token_embedding).detach()
-        
-        generated_tokens = [next_token]
-        generated_tokens_embedding = [next_token_embedding]
-        
-        # Generate remaining tokens
-        for pos in range(t, t + max_new_tokens - 1):
-            input_pos = torch.tensor([pos], device=device)
-            logits = self.model(next_token.view(1, -1), input_pos)
-            probs = F.softmax(logits[0, -1] / temperature, dim=-1)
-            
-            # Sample discrete token
-            next_token = torch.multinomial(probs, 1)
-            
-            # Get token embeddings with straight-through estimator
-            next_token_embedding = self.model.transformer.wte(next_token)
-            soft_probs = probs.unsqueeze(0)
-            soft_embedding = torch.matmul(soft_probs, self.model.transformer.wte.weight)
-            next_token_embedding = next_token_embedding + (soft_embedding - next_token_embedding).detach()
-            
-            generated_tokens.append(next_token)
-            generated_tokens_embedding.append(next_token_embedding)
-        
-        generated_tokens = torch.cat(generated_tokens, dim=0)
-        generated_tokens_embedding = torch.cat(generated_tokens_embedding, dim=0)
-        return generated_tokens_embedding
+        return last_token_features.unsqueeze(0)  # Shape: [1, dim]
 
     def forward_video(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
