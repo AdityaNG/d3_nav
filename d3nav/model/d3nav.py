@@ -1,6 +1,5 @@
-import math
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -142,15 +141,13 @@ class D3Nav(BaseModel):
         start_layer = total_layers - num_layers
 
         # Initialize for selected layers
-        for i in range(total_layers - num_layers, total_layers):
+        for i in range(start_layer, total_layers):
             layer = self.model.transformer.h[i]
             for param in layer.parameters():
                 param.requires_grad = True
 
-        
         for param in self.model.lm_head.parameters():
             param.requires_grad = True
-
 
     def freeze_vqvae(self, requires_grad=False):
         for param in self.encoder.parameters():
@@ -166,7 +163,7 @@ class D3Nav(BaseModel):
             param.requires_grad = requires_grad
         for param in self.traj_decoder.parameters():
             param.requires_grad = requires_grad
-    
+
     def freeze_traj_dec(self, requires_grad=False):
         """
         Freezes the trajectory encoder and decoder parameters
@@ -209,7 +206,7 @@ class D3Nav(BaseModel):
         # z: torch.Tensor = self.encoder(x)
         z, z_history_feats = self.encoder(x, return_feats=True)
         z_history_feats = z_history_feats.reshape(B, T, 256, 8, 16)
-        
+
         z = z.reshape(B, T, -1)
 
         # Create BOS tokens
@@ -242,21 +239,29 @@ class D3Nav(BaseModel):
 
         return ego_trajectory
 
-    def differentiable_generate(self, prompt: torch.Tensor, max_new_tokens: int, temperature: float = 1.0) -> torch.Tensor:
-        """Single forward pass to get transformer features for trajectory decoder"""
+    def differentiable_generate(
+        self,
+        prompt: torch.Tensor,
+        max_new_tokens: int,
+        temperature: float = 1.0,
+    ) -> torch.Tensor:
+        """Single forward pass to get transformer
+        features for trajectory decoder"""
         t = prompt.size(0)
         device = prompt.device
-        
+
         # Single forward pass through transformer
         input_pos = torch.arange(0, t, device=device)
         transformer_output = self.model(prompt.view(1, -1), input_pos)
-        
+
         # Return the features for the last token
         last_token_features = transformer_output[0, -1]  # Shape: [dim]
-        
+
         return last_token_features.unsqueeze(0)  # Shape: [1, dim]
 
-    def forward_video(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward_video(
+        self, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Takes a video context as input
         Encodes it into token space
@@ -1110,13 +1115,6 @@ def transpose_and_clip(tensors):
 def transform_img(
     frame, output_size=OUTPUT_SIZE, crop_size=CROP_SIZE, scale=SCALE, cy=CY
 ):
-    # size = frame.shape[:2][::-1]
-    # scaled_crop_size = (int(crop_size[0] * scale), int(crop_size[1] * scale))
-    # x0, y0 = (
-    #     size[1] // 2 - int(crop_size[1] * scale) // 2 - int(cy * scale) // 2,
-    #     size[0] // 2 - int(crop_size[0] * scale) // 2,
-    # )
-    # frame = frame[x0 : x0 + scaled_crop_size[1], y0 : y0 + scaled_crop_size[0]]
     return cv2.resize(frame, output_size)
 
 
@@ -1136,15 +1134,17 @@ if __name__ == "__main__":
 
     B, T, C, H, W = 1, 8, 3, 128, 256
 
-    x = torch.zeros((B, T, C, H, W), requires_grad=True)  # Add requires_grad=True
+    x = torch.zeros(
+        (B, T, C, H, W), requires_grad=True
+    )  # Add requires_grad=True
     model = D3Nav()
     model.unfreeze_last_n_layers(num_layers=3)
 
     traj = model(x)
-    
+
     # Test gradient flow
     loss = traj.sum()
     loss.backward()
-    
-    print('x.grad is None:', x.grad is None)
-    print('traj grad_fn:', traj.grad_fn)
+
+    print("x.grad is None:", x.grad is None)
+    print("traj grad_fn:", traj.grad_fn)

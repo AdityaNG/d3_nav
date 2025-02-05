@@ -1,19 +1,14 @@
-import random
-
 import cv2
 import numpy as np
 import torch
 from nuscenes.nuscenes import NuScenes
 from nuscenes.prediction import PredictHelper
-from nuscenes.utils.data_classes import Box
-from pyquaternion import Quaternion
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
-from torch.utils.data import DataLoader
-from torch.utils.data._utils.collate import default_collate
 
-from d3nav.metric_stp3 import PlanningMetric
-from d3nav.model.d3nav import DEFAULT_DATATYPE, D3Nav, transform_img
+# from nuscenes.utils.data_classes import Box
+from nuscenes.utils.splits import create_splits_scenes
+from pyquaternion import Quaternion
+
+from d3nav.model.d3nav import transform_img
 
 
 class NuScenesDataset(torch.utils.data.Dataset):
@@ -33,14 +28,17 @@ class NuScenesDataset(torch.utils.data.Dataset):
 
         # Create our own train/val split
         all_scenes = self.nusc.scene
-        random.shuffle(all_scenes)
-        split_idx = int(len(all_scenes) * (1 - val_split))
-        self.scenes = (
-            all_scenes[:split_idx] if is_train else all_scenes[split_idx:]
-        )
+        splits = create_splits_scenes()
+        scene_names = splits["train"] if is_train else splits["val"]
+
+        self.scenes = []
+        for scene in all_scenes:
+            if scene.name in scene_names:
+                self.scenes.append(scene)
 
         print(
-            f"{'Train' if is_train else 'Validation'} set: {len(self.scenes)} scenes"
+            f"{'Train' if is_train else 'Validation'} "
+            f"set: {len(self.scenes)} scenes"
         )
         self.samples = self._get_samples()
 
@@ -105,7 +103,9 @@ class NuScenesDataset(torch.utils.data.Dataset):
                 sample_token = sample["next"]
 
         print(
-            f"Loaded {len(samples)} samples for {'training' if self.is_train else 'validation'}"
+            f"Loaded {len(samples)} samples for {
+                'training' if self.is_train else 'validation'
+            }"
         )
         return samples
 
@@ -161,7 +161,7 @@ class NuScenesDataset(torch.utils.data.Dataset):
             #     center=ann['translation'],
             #     size=ann['size'],
             #     orientation=Quaternion(ann['rotation']),
-            #     name=ann['category_name'],  # Use 'name' instead of 'label' for the category
+            #     name=ann['category_name'],  # Use 'name' instead of 'label' for the category  # noqa
             #     token=ann['token']
             # )
 

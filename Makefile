@@ -32,10 +32,10 @@ fmt:              ## Format code using black & isort.
 
 .PHONY: lint
 lint:             ## Run pep8, black, mypy linters.
-	$(ENV_PREFIX)flake8 --exclude=d3nav/utils/ --per-file-ignores="*.py:E203" d3nav/
+	$(ENV_PREFIX)flake8 --exclude=d3nav/utils/,d3nav/metric_stp3.py --per-file-ignores="*.py:E203" d3nav/
 	$(ENV_PREFIX)black -l 79 --check d3nav/
 	$(ENV_PREFIX)black -l 79 --check tests/
-	$(ENV_PREFIX)mypy --exclude=d3nav/utils/ --ignore-missing-imports d3nav/
+	$(ENV_PREFIX)mypy --exclude=d3nav/utils/,d3nav/metric_stp3.py --ignore-missing-imports d3nav/
 
 .PHONY: test
 test: lint        ## Run tests and generate coverage report.

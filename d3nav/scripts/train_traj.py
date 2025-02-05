@@ -1,15 +1,9 @@
-import os
-import random
-
-import cv2
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from nuscenes.eval.prediction.splits import get_prediction_challenge_split
 from nuscenes.nuscenes import NuScenes
-from nuscenes.prediction import PredictHelper
-from nuscenes.utils.data_classes import Box
-from pyquaternion import Quaternion
+
+# from nuscenes.utils.data_classes import Box
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
@@ -17,15 +11,18 @@ from torch.utils.data._utils.collate import default_collate
 
 from d3nav.datasets.nusc import NuScenesDataset
 from d3nav.metric_stp3 import PlanningMetric
-from d3nav.model.d3nav import DEFAULT_DATATYPE, D3Nav, transform_img
+from d3nav.model.d3nav import DEFAULT_DATATYPE, D3Nav
 
 torch.set_float32_matmul_precision("medium")
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.use_deterministic_algorithms(True, warn_only=True)
 
+
 class D3NavTrainingModule(pl.LightningModule):
-    def __init__(self,):
+    def __init__(
+        self,
+    ):
         super().__init__()
         self.model = D3Nav().to(dtype=DEFAULT_DATATYPE)
         self.metric = PlanningMetric()
@@ -44,10 +41,9 @@ class D3NavTrainingModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         if len(batch) == 3:
-            x, y, bboxes = batch
+            x, y, _ = batch
         else:
             x, y = batch
-            bboxes = None
 
         batch_size = x.shape[0]
 
@@ -94,7 +90,7 @@ class D3NavTrainingModule(pl.LightningModule):
         #         bboxes, bboxes)
         #     occupancy = torch.logical_or(segmentation, pedestrian)
 
-        #     obj_coll_sum, obj_box_coll_sum = self.metric.evaluate_coll(pred_trajectory[:, :, :2], y[:, :, :2], bboxes)
+        #     obj_coll_sum, obj_box_coll_sum = self.metric.evaluate_coll(pred_trajectory[:, :, :2], y[:, :, :2], bboxes)  # noqa
         #     col_1s = obj_box_coll_sum[:2].sum() / (2 * len(batch))
         #     col_2s = obj_box_coll_sum[:4].sum() / (4 * len(batch))
         #     col_3s = obj_box_coll_sum.sum() / (6 * len(batch))
@@ -163,15 +159,15 @@ def main():
     )
 
     # ckpt = None
-    ckpt = "checkpoints/traj_quantizer/d3nav-traj-epoch-42-val_loss-1.3925.ckpt"
+    ckpt = (
+        "checkpoints/traj_quantizer/d3nav-traj-epoch-42-val_loss-1.3925.ckpt"
+    )
 
     if ckpt is None:
         # Initialize training module
         training_module = D3NavTrainingModule()
     else:
-        training_module = D3NavTrainingModule.load_from_checkpoint(
-            ckpt
-        )
+        training_module = D3NavTrainingModule.load_from_checkpoint(ckpt)
 
     # Initialize logger
     logger = WandbLogger(project="D3Nav-NuScenes-Traj")

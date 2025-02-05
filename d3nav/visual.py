@@ -6,9 +6,7 @@ from typing import Tuple
 
 import cv2
 import numpy as np
-import torch
-import torchvision
-from scipy.signal import savgol_filter
+
 
 def convert_3D_points_to_2D(points_3D, homo_cam_mat):
     points_2D = []
@@ -100,9 +98,7 @@ def plot_steering_traj(
     h, w = frame_center.shape[:2]
 
     if intrinsic_matrix is None:
-        intrinsic_matrix = estimate_intrinsics(
-            65.6, 42.4, h, w
-        )
+        intrinsic_matrix = estimate_intrinsics(65.6, 42.4, h, w)
     if DistCoef is None:
         DistCoef = np.array(
             [
@@ -147,7 +143,6 @@ def plot_steering_traj(
             # frame_center = cv2.circle(frame_center, (px, py), 2, color, -1)
             if prev_point is not None:
                 px_p, py_p = prev_point
-                dist = ((px_p - px) ** 2 + (py_p - py) ** 2) ** 0.5
                 if track:
                     rect_coords_3D = get_rect_coords_3D(p4d, prev_point_3D)
                     rect_coords = convert_3D_points_to_2D(
@@ -223,6 +218,7 @@ def plot_bev_trajectory(trajectory, frame_center, color=(0, 255, 0)):
     traj_plot = cv2.flip(traj_plot, 0)
     return traj_plot
 
+
 def estimate_intrinsics(
     fov_x: float,  # degrees
     fov_y: float,  # degrees
@@ -264,6 +260,7 @@ def estimate_intrinsics(
 
     return intrinsic_matrix
 
+
 def visualize_frame_img(
     img: np.ndarray,
     trajectory: np.ndarray,
@@ -274,8 +271,6 @@ def visualize_frame_img(
     speed = dx / (1.0 / 2.0)
     # m/s to km/h
     speed_kmph = speed * 3.6
-    # speed mph
-    speed_mph = speed_kmph * 0.621371
 
     img = plot_steering_traj(
         img,

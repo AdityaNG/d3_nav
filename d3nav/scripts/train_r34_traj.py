@@ -1,29 +1,24 @@
-# NCCL_DEBUG=INFO NCCL_P2P_LEVEL=NVL CUBLAS_WORKSPACE_CONFIG=:16:8 python3 -m d3nav.scripts.train_r34_traj
+# NCCL_DEBUG=INFO NCCL_P2P_LEVEL=NVL CUBLAS_WORKSPACE_CONFIG=:16:8 python3 -m d3nav.scripts.train_r34_traj  # noqa
 
-import os
-import random
 import math
 
-import cv2
-import numpy as np
 import lightning.pytorch as pl
+import numpy as np
 import torch
 import torchvision.models as models
-from nuscenes.eval.prediction.splits import get_prediction_challenge_split
-from nuscenes.nuscenes import NuScenes
-from nuscenes.prediction import PredictHelper
-from nuscenes.utils.data_classes import Box
-from pyquaternion import Quaternion
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
-from torch.utils.data import DataLoader
-from torch.utils.data._utils.collate import default_collate
+from nuscenes.nuscenes import NuScenes
+
+# from nuscenes.utils.data_classes import Box
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import DataLoader
+from torch.utils.data._utils.collate import default_collate
 
 from d3nav.datasets.nusc import NuScenesDataset
 from d3nav.metric_stp3 import PlanningMetric
-from d3nav.model.d3nav import TrajectoryDecoder, DEFAULT_DATATYPE
+from d3nav.model.d3nav import TrajectoryDecoder
 
 torch.set_float32_matmul_precision("medium")
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -38,42 +33,48 @@ accumulate_grad_batches = int(
     effective_batch_size / (batch_size_per_device * num_devices)
 )
 
-assert accumulate_grad_batches * batch_size_per_device * num_devices == effective_batch_size
+assert (
+    accumulate_grad_batches * batch_size_per_device * num_devices
+    == effective_batch_size
+)
 
-learning_rate = 5e-5 * math.sqrt(effective_batch_size/24)
+learning_rate = 5e-5 * math.sqrt(effective_batch_size / 24)
+
 
 class ResNet34Trajectory(torch.nn.Module):
     def __init__(self):
         super().__init__()
         # Load pretrained ResNet34
         resnet = models.resnet34(pretrained=True)
-        
+
         # Remove the last layer
         self.features = torch.nn.Sequential(*list(resnet.children())[:-1])
-        
+
         # Layers to match the trajectory encoder output
         # Output should match TrajectoryEncoder's output: (B, 1, 256)
         self.trajectory_head = torch.nn.Sequential(
             torch.nn.Linear(512, 512),
             torch.nn.ReLU(),
             torch.nn.Linear(512, 256),
-            torch.nn.LayerNorm(256),  # Normalization to match embedding statistics
+            torch.nn.LayerNorm(
+                256
+            ),  # Normalization to match embedding statistics
         )
 
         # Load and freeze trajectory decoder
-        ckpt = "checkpoints/traj_quantizer/d3nav-traj-epoch-132-val_loss-0.2792.ckpt"
+        ckpt = "checkpoints/traj_quantizer/d3nav-traj-epoch-132-val_loss-0.2792.ckpt"  # noqa
         self.trajectory_decoder = TrajectoryDecoder()
 
         # Load checkpoint and extract trajectory decoder weights
         checkpoint = torch.load(ckpt)
-        model_state_dict = checkpoint['state_dict']
-        
+        model_state_dict = checkpoint["state_dict"]
+
         # Filter and rename the trajectory decoder weights
         traj_decoder_state_dict = {}
         for k, v in model_state_dict.items():
-            if 'model.traj_decoder' in k:
+            if "model.traj_decoder" in k:
                 # Remove the 'model.traj_decoder.' prefix from the key
-                new_key = k.replace('model.traj_decoder.', '')
+                new_key = k.replace("model.traj_decoder.", "")
                 traj_decoder_state_dict[new_key] = v
 
         # Load the filtered weights into trajectory decoder
@@ -84,19 +85,20 @@ class ResNet34Trajectory(torch.nn.Module):
 
     def forward(self, x):
         # Expected input: (batch_size, time, channels, height, width)
-        x = x[:,0,:,:,:]  # Use only first frame
-        
+        x = x[:, 0, :, :, :]  # Use only first frame
+
         # Get features from ResNet
         features = self.features(x)
         features = torch.flatten(features, 1)
-        
+
         # Get latent representation
         latent = self.trajectory_head(features)
         latent = latent.unsqueeze(1)  # (B, 1, 256) to match encoder output
-        
+
         # Decode trajectory
         trajectory = self.trajectory_decoder(latent)
         return trajectory
+
 
 class ResNet34TrainingModule(pl.LightningModule):
     def __init__(self):
@@ -111,7 +113,9 @@ class ResNet34TrainingModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         pred_trajectory = self(x)
-        loss = torch.nn.functional.l1_loss(pred_trajectory, y)  # Only use x,y coordinates
+        loss = torch.nn.functional.l1_loss(
+            pred_trajectory, y
+        )  # Only use x,y coordinates
         lrs = self.scheduler.get_last_lr()
 
         if batch_idx % 10 == 0:
@@ -121,14 +125,15 @@ class ResNet34TrainingModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         if len(batch) == 3:
-            x, y, bboxes = batch
+            x, y, _ = batch
         else:
             x, y = batch
-            bboxes = None
 
         batch_size = x.shape[0]
         pred_trajectory = self(x)
-        loss = torch.nn.functional.l1_loss(pred_trajectory, y)  # Only use x,y coordinates
+        loss = torch.nn.functional.l1_loss(
+            pred_trajectory, y
+        )  # Only use x,y coordinates
         self.log("val_loss", loss)
 
         l2_1s_l = []
@@ -169,29 +174,34 @@ class ResNet34TrainingModule(pl.LightningModule):
     def configure_optimizers(self):
 
         optimizer = Adam(self.parameters(), lr=learning_rate)
-        
+
         # Warmup parameters
         num_training_steps = 800 * 10
-        num_warmup_steps = round(0.05 * num_training_steps)  # Typically 5-10% of total steps
-        
+        num_warmup_steps = round(
+            0.05 * num_training_steps
+        )  # Typically 5-10% of total steps
+
         def lr_lambda(current_step: int):
             # Linear warmup
             if current_step < num_warmup_steps:
                 return float(current_step) / float(max(1, num_warmup_steps))
             # Cosine decay after warmup
-            progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
+            progress = float(current_step - num_warmup_steps) / float(
+                max(1, num_training_steps - num_warmup_steps)
+            )
             return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
-        
+
         scheduler = LambdaLR(optimizer, lr_lambda)
         lr_scheduler = {
             "scheduler": scheduler,
             "interval": "step",  # Update at each step rather than epoch
             "frequency": 1,
-            'name': 'd3nav_lr_scheduler'
+            "name": "d3nav_lr_scheduler",
         }
 
         self.scheduler = scheduler
         return [optimizer], [lr_scheduler]
+
 
 def custom_collate(batch):
     x = []
@@ -209,6 +219,7 @@ def custom_collate(batch):
     if bboxes:
         return x, y, bboxes
     return x, y
+
 
 def main():
     # ... existing code ...
@@ -265,7 +276,9 @@ def main():
         accumulate_grad_batches=accumulate_grad_batches,
         val_check_interval=0.125,
         logger=logger,
-        callbacks=[checkpoint_callback,],
+        callbacks=[
+            checkpoint_callback,
+        ],
         precision="bf16-mixed",
         num_sanity_val_steps=1,
         strategy="ddp",
@@ -277,6 +290,7 @@ def main():
         train_loader,
         val_loader,
     )
+
 
 if __name__ == "__main__":
     main()

@@ -1,27 +1,22 @@
-# NCCL_DEBUG=INFO NCCL_P2P_LEVEL=NVL CUBLAS_WORKSPACE_CONFIG=:16:8 nohup python3 -m d3nav.scripts.train &
-import os
-import random
+# NCCL_DEBUG=INFO NCCL_P2P_LEVEL=NVL CUBLAS_WORKSPACE_CONFIG=:16:8 nohup python3 -m d3nav.scripts.train &  # noqa
 import math
 
-import cv2
-import numpy as np
 import lightning.pytorch as pl
+import numpy as np
 import torch
-from nuscenes.eval.prediction.splits import get_prediction_challenge_split
-from nuscenes.nuscenes import NuScenes
-from nuscenes.prediction import PredictHelper
-from nuscenes.utils.data_classes import Box
-from pyquaternion import Quaternion
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
-from torch.utils.data import DataLoader
-from torch.utils.data._utils.collate import default_collate
+from nuscenes.nuscenes import NuScenes
+
+# from nuscenes.utils.data_classes import Box
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import DataLoader
+from torch.utils.data._utils.collate import default_collate
 
 from d3nav.datasets.nusc import NuScenesDataset
 from d3nav.metric_stp3 import PlanningMetric
-from d3nav.model.d3nav import DEFAULT_DATATYPE, D3Nav, transform_img
+from d3nav.model.d3nav import D3Nav
 
 torch.set_float32_matmul_precision("medium")
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -36,12 +31,16 @@ accumulate_grad_batches = int(
     effective_batch_size / (batch_size_per_device * num_devices)
 )
 
-assert accumulate_grad_batches * batch_size_per_device * num_devices == effective_batch_size
+assert (
+    accumulate_grad_batches * batch_size_per_device * num_devices
+    == effective_batch_size
+)
 
-learning_rate = 5e-5 * math.sqrt(effective_batch_size/24)
+learning_rate = 5e-5 * math.sqrt(effective_batch_size / 24)
 
 num_layers = 3
 traj_requires_grad = True
+
 
 class D3NavTrainingModule(pl.LightningModule):
     def __init__(self):
@@ -52,9 +51,7 @@ class D3NavTrainingModule(pl.LightningModule):
         self.model.freeze_traj_dec(
             requires_grad=traj_requires_grad,
         )
-        self.model.unfreeze_last_n_layers(
-            num_layers=num_layers
-        )
+        self.model.unfreeze_last_n_layers(num_layers=num_layers)
         self.clip_grad_norm = 1.0  # Standard value, adjust if needed
 
     def forward(self, x):
@@ -67,22 +64,30 @@ class D3NavTrainingModule(pl.LightningModule):
         lrs = self.scheduler.get_last_lr()
 
         if batch_idx % 10 == 0:
-            self.log("train_loss", loss, )
-            self.log("learning_rate", sum(lrs) / float(len(lrs)), )
+            self.log(
+                "train_loss",
+                loss,
+            )
+            self.log(
+                "learning_rate",
+                sum(lrs) / float(len(lrs)),
+            )
         return loss
 
     def validation_step(self, batch, batch_idx):
         if len(batch) == 3:
-            x, y, bboxes = batch
+            x, y, _ = batch
         else:
             x, y = batch
-            bboxes = None
 
         batch_size = x.shape[0]
 
         pred_trajectory = self(x)
         loss = torch.nn.functional.l1_loss(pred_trajectory, y)
-        self.log("val_loss", loss, )
+        self.log(
+            "val_loss",
+            loss,
+        )
 
         l2_1s_l = []
         l2_2s_l = []
@@ -114,7 +119,6 @@ class D3NavTrainingModule(pl.LightningModule):
                 "val_l2_2s": l2_2s,
                 "val_l2_3s": l2_3s,
             },
-            
         )
 
         # TODO: fix this
@@ -124,7 +128,7 @@ class D3NavTrainingModule(pl.LightningModule):
         #         bboxes, bboxes)
         #     occupancy = torch.logical_or(segmentation, pedestrian)
 
-        #     obj_coll_sum, obj_box_coll_sum = self.metric.evaluate_coll(pred_trajectory[:, :, :2], y[:, :, :2], bboxes)
+        #     obj_coll_sum, obj_box_coll_sum = self.metric.evaluate_coll(pred_trajectory[:, :, :2], y[:, :, :2], bboxes)  # noqa
         #     col_1s = obj_box_coll_sum[:2].sum() / (2 * len(batch))
         #     col_2s = obj_box_coll_sum[:4].sum() / (4 * len(batch))
         #     col_3s = obj_box_coll_sum.sum() / (6 * len(batch))
@@ -141,29 +145,34 @@ class D3NavTrainingModule(pl.LightningModule):
     def configure_optimizers(self):
 
         optimizer = Adam(self.parameters(), lr=learning_rate)
-        
+
         # Warmup parameters
         num_training_steps = 800 * 10
-        num_warmup_steps = round(0.05 * num_training_steps)  # Typically 5-10% of total steps
-        
+        num_warmup_steps = round(
+            0.05 * num_training_steps
+        )  # Typically 5-10% of total steps
+
         def lr_lambda(current_step: int):
             # Linear warmup
             if current_step < num_warmup_steps:
                 return float(current_step) / float(max(1, num_warmup_steps))
             # Cosine decay after warmup
-            progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
+            progress = float(current_step - num_warmup_steps) / float(
+                max(1, num_training_steps - num_warmup_steps)
+            )
             return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
-        
+
         scheduler = LambdaLR(optimizer, lr_lambda)
         lr_scheduler = {
             "scheduler": scheduler,
             "interval": "step",  # Update at each step rather than epoch
             "frequency": 1,
-            'name': 'd3nav_lr_scheduler'
+            "name": "d3nav_lr_scheduler",
         }
 
         self.scheduler = scheduler
         return [optimizer], [lr_scheduler]
+
 
 def custom_collate(batch):
     x = []
@@ -217,16 +226,16 @@ def main():
     )
 
     # ckpt = None
-    # ckpt = "checkpoints/traj_quantizer/d3nav-traj-epoch-132-val_loss-0.2792.ckpt"
-    ckpt = "checkpoints/d3nav/d3nav-epoch-06-val_loss-0.6668.ckpt"
+    ckpt = (
+        "checkpoints/traj_quantizer/d3nav-traj-epoch-132-val_loss-0.2792.ckpt"
+    )
+    # ckpt = "checkpoints/d3nav/d3nav-epoch-06-val_loss-0.6668.ckpt"
 
     if ckpt is None:
         # Initialize training module
         training_module = D3NavTrainingModule()
     else:
-        training_module = D3NavTrainingModule.load_from_checkpoint(
-            ckpt
-        )
+        training_module = D3NavTrainingModule.load_from_checkpoint(ckpt)
 
     # Initialize logger
     logger = WandbLogger(project="D3Nav-NuScenes")
@@ -249,11 +258,13 @@ def main():
         accumulate_grad_batches=accumulate_grad_batches,
         val_check_interval=0.125,
         logger=logger,
-        callbacks=[checkpoint_callback,],
+        callbacks=[
+            checkpoint_callback,
+        ],
         precision="bf16-mixed",
         num_sanity_val_steps=1,
         strategy="ddp",  # distributed strategy
-        sync_batchnorm=True,  # Synchronize batch normalization between processes
+        sync_batchnorm=True,  # Synchronize batch normalization between processes  # noqa
     )
 
     # Train the model
