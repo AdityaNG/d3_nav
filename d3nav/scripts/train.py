@@ -41,6 +41,7 @@ assert accumulate_grad_batches * batch_size_per_device * num_devices == effectiv
 learning_rate = 5e-5 * math.sqrt(effective_batch_size/24)
 
 num_layers = 3
+traj_requires_grad = True
 
 class D3NavTrainingModule(pl.LightningModule):
     def __init__(self):
@@ -48,6 +49,9 @@ class D3NavTrainingModule(pl.LightningModule):
         self.model = D3Nav()
         self.metric = PlanningMetric()
 
+        self.model.freeze_traj_dec(
+            requires_grad=traj_requires_grad,
+        )
         self.model.unfreeze_last_n_layers(
             num_layers=num_layers
         )

@@ -6,7 +6,9 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/d3nav)](https://pypi.org/project/d3nav/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/d3nav)
 
-D³Nav: Data-Driven Driving Agents for Autonomous Vehicles in Unstructured Traffic
+D³Nav: Data-Driven Driving Agents for Autonomous Vehicles in Unstructured Traffic.
+
+This repo is my implementation of D3Nav using CommaAI's video world model, fine tuning it using the D3Nav methodology on NuScenes.
 
 <img src="media/arch.png" width="50%" />
 

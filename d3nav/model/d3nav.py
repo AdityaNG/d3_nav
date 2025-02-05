@@ -166,6 +166,13 @@ class D3Nav(BaseModel):
             param.requires_grad = requires_grad
         for param in self.traj_decoder.parameters():
             param.requires_grad = requires_grad
+    
+    def freeze_traj_dec(self, requires_grad=False):
+        """
+        Freezes the trajectory encoder and decoder parameters
+        """
+        for param in self.traj_decoder.parameters():
+            param.requires_grad = requires_grad
 
     def freeze_gpt(self, requires_grad=False):
         for param in self.model.parameters():
