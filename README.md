@@ -57,6 +57,8 @@ python3 -m d3nav --video_path input_video.mp4
 
 ## Usage
 
+Download our [checkpoints from google drive](https://drive.google.com/drive/u/0/folders/18o7e1UnpvNmO3sZD7J_x9xjG9IW9g8QK)
+
 ```py
 from d3nav.model import D3Nav
 
