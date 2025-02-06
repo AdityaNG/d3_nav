@@ -33,7 +33,7 @@ class NuScenesDataset(torch.utils.data.Dataset):
 
         self.scenes = []
         for scene in all_scenes:
-            if scene.name in scene_names:
+            if scene["name"] in scene_names:
                 self.scenes.append(scene)
 
         print(
@@ -102,11 +102,8 @@ class NuScenesDataset(torch.utils.data.Dataset):
 
                 sample_token = sample["next"]
 
-        print(
-            f"Loaded {len(samples)} samples for {
-                'training' if self.is_train else 'validation'
-            }"
-        )
+        set_name = "training" if self.is_train else "validation"
+        print(f"Loaded {len(samples)} samples for {set_name}")
         return samples
 
     def _get_ego_future_trajectory(self, sample_token):

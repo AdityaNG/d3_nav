@@ -76,6 +76,8 @@ class TrajectoryDecoder(nn.Module):
         # Reshape to trajectory format
         x = x.reshape(B, 6, 3)
 
+        x = x.cumsum(dim=1)
+
         return x
 
 
@@ -229,7 +231,8 @@ class D3Nav(BaseModel):
 
             zp_l.append(zp_i)
         zp: torch.Tensor = torch.stack(zp_l)
-        zp = zp.reshape(B, self.config_gpt.dim + 1)
+        zp = zp.reshape(B, 1032, self.config_gpt.dim + 1)
+        zp = zp.mean(1)
 
         planner_features = zp.reshape(B, 1, 1025)
 
@@ -254,10 +257,7 @@ class D3Nav(BaseModel):
         input_pos = torch.arange(0, t, device=device)
         transformer_output = self.model(prompt.view(1, -1), input_pos)
 
-        # Return the features for the last token
-        last_token_features = transformer_output[0, -1]  # Shape: [dim]
-
-        return last_token_features.unsqueeze(0)  # Shape: [1, dim]
+        return transformer_output
 
     def forward_video(
         self, x: torch.Tensor

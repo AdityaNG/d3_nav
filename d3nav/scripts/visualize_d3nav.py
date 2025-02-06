@@ -46,8 +46,14 @@ def main():
     # ckpt = 'checkpoints/d3nav/d3nav-epoch-01-val_loss-0.5547.ckpt'  # 2 layers, traj unfrozen, starts from d3nav/d3nav-epoch-06-val_loss-0.6668.ckpt  # noqa
     # unfreezing the trajectory decoder unlocks a lot of performance. Model becomes very good at estimating speed, but many turns get missed, plus trajectory is still ever so slightly crooked  # noqa
 
-    ckpt = "checkpoints/d3nav/d3nav-epoch-03-val_loss-0.5128.ckpt"  # 3 layers, traj unfrozen, starts from d3nav/d3nav-epoch-06-val_loss-0.6668.ckpt  # noqa
-    # Good checkpoint, l2 (1s) of 0.43  # noqa
+    # ckpt = "checkpoints/d3nav/d3nav-epoch-03-val_loss-0.5128.ckpt"  # 3 layers, traj unfrozen, starts from d3nav/d3nav-epoch-06-val_loss-0.6668.ckpt  # noqa
+    # Good checkpoint, l2 (1s) of 0.43, but had some train-val leakage  # noqa
+
+    # ckpt = "checkpoints/d3nav/d3nav-epoch-03-val_loss-0.7735.ckpt"  # 3 layers, traj unfrozen, from scratch  # noqa
+    # Good checkpoint, l2 (1s) of 0.70895, no train-val leakage  # noqa
+
+    ckpt = "checkpoints/d3nav/d3nav-epoch-15-val_loss-0.7631.ckpt"  # 3 layers, avg pool, cumulative, traj unfrozen, from scratch  # noqa
+    # Learns turning, l2 (1s) of 0.75
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -129,7 +135,6 @@ def main():
             processed_img = (
                 torch.from_numpy(x).unsqueeze(0).to("cuda")
             )  # Add batch dimension
-            print("processed_img", processed_img.shape)
             img_trajectory = model.model(processed_img)
             img_trajectory = (
                 img_trajectory[0].cpu().numpy()
@@ -244,7 +249,7 @@ def main():
                 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                 video_path = f"{out_dir}/chunk_{chunk:03d}.mp4"
                 video_writer = cv2.VideoWriter(
-                    video_path, fourcc, fps, (width, height)
+                    video_path, fourcc, fps * 2, (width, height)
                 )
                 print(
                     f"Created new video file with dimensions {width}x{height}"

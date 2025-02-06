@@ -68,7 +68,7 @@ def main():
     parser.add_argument(
         "--ckpt",
         type=str,
-        default="checkpoints/d3nav/d3nav-epoch-03-val_loss-0.5128.ckpt",
+        default="checkpoints/d3nav/d3nav-epoch-03-val_loss-0.7735.ckpt",
         help="Path to checkpoint",
     )
     args = parser.parse_args()
@@ -106,6 +106,8 @@ def main():
             ret, frame = cap.read()
             if not ret:
                 break
+            
+            frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
 
             # Add current frame to history
             frame_history.append(frame.copy())

@@ -147,7 +147,7 @@ class D3NavTrainingModule(pl.LightningModule):
         optimizer = Adam(self.parameters(), lr=learning_rate)
 
         # Warmup parameters
-        num_training_steps = 800 * 10
+        num_training_steps = 4000
         num_warmup_steps = round(
             0.05 * num_training_steps
         )  # Typically 5-10% of total steps
@@ -230,6 +230,7 @@ def main():
         "checkpoints/traj_quantizer/d3nav-traj-epoch-132-val_loss-0.2792.ckpt"
     )
     # ckpt = "checkpoints/d3nav/d3nav-epoch-06-val_loss-0.6668.ckpt"
+    # ckpt = "checkpoints/d3nav/d3nav-epoch-03-val_loss-0.7735.ckpt"
 
     if ckpt is None:
         # Initialize training module
@@ -256,7 +257,7 @@ def main():
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
         devices=num_devices,
         accumulate_grad_batches=accumulate_grad_batches,
-        val_check_interval=0.125,
+        val_check_interval=0.5,
         logger=logger,
         callbacks=[
             checkpoint_callback,
