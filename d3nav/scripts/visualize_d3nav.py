@@ -52,8 +52,10 @@ def main():
     # ckpt = "checkpoints/d3nav/d3nav-epoch-03-val_loss-0.7735.ckpt"  # 3 layers, traj unfrozen, from scratch  # noqa
     # Good checkpoint, l2 (1s) of 0.70895, no train-val leakage  # noqa
 
-    ckpt = "checkpoints/d3nav/d3nav-epoch-15-val_loss-0.7631.ckpt"  # 3 layers, avg pool, cumulative, traj unfrozen, from scratch  # noqa
-    # Learns turning, l2 (1s) of 0.75
+    # ckpt = "checkpoints/d3nav/d3nav-epoch-15-val_loss-0.7631.ckpt"  # 3 layers, avg pool, cumulative, traj unfrozen, from scratch  # noqa
+    # Learns turning, l2 (1s) of 0.67041
+
+    ckpt = "checkpoints/d3nav/d3nav-epoch-15-val_loss-0.6955.ckpt"  # 3 layers, ChunkedAttention, cumulative, traj unfrozen, from scratch  # noqa
 
     parser = argparse.ArgumentParser()
     parser.add_argument(

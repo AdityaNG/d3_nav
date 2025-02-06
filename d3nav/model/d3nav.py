@@ -81,6 +81,27 @@ class TrajectoryDecoder(nn.Module):
         return x
 
 
+class ChunkedAttention(nn.Module):
+    def __init__(self, chunk_size=43):
+        super().__init__()
+        self.chunk_size = chunk_size
+        self.attention = nn.Linear(1025, 1)
+
+    def forward(self, x):  # x: (B, 1032, 1025)
+        # Reshape to chunks
+        B = x.shape[0]
+        x = x.reshape(B, -1, self.chunk_size, 1025)  # (B, 32, 32, 1025)
+
+        # Attend within chunks
+        weights = F.softmax(self.attention(x), dim=2)
+        x = (x * weights).sum(dim=2)  # (B, 32, 1025)
+
+        # Final attention across chunks
+        weights = F.softmax(self.attention(x), dim=1)
+        x = (x * weights).sum(dim=1)  # (B, 1025)
+        return x.unsqueeze(1)
+
+
 class D3Nav(BaseModel):
     """
     Building the d3nav Architecture from Comma AI's pretrained weights
@@ -120,12 +141,17 @@ class D3Nav(BaseModel):
             )
 
         self.encoder = encoder
-        self.T = 8
-        self.temporal_context = 1
+        self.T: int = 8
+        self.temporal_context: int = 1
+
+        self.dropout_rate: float = 0.0
 
         # Initialize trajectory encoder and decoder
         self.traj_encoder = TrajectoryEncoder()
         self.traj_decoder = TrajectoryDecoder()
+
+        self.chunked_attention = ChunkedAttention(chunk_size=43)
+        self.trajectory_proj = nn.Linear(1025, 256)
 
         # Freeze
         self.freeze_vqvae()
@@ -232,9 +258,14 @@ class D3Nav(BaseModel):
             zp_l.append(zp_i)
         zp: torch.Tensor = torch.stack(zp_l)
         zp = zp.reshape(B, 1032, self.config_gpt.dim + 1)
-        zp = zp.mean(1)
 
-        planner_features = zp.reshape(B, 1, 1025)
+        # Chunked attention processing
+        zp = self.chunked_attention(zp)  # (B, 1, 1025)
+
+        # Project to expected dimension
+        zp = self.trajectory_proj(zp.squeeze(1))  # (B, 256)
+
+        planner_features = zp.reshape(B, 1, 256)
 
         # During training, we can use the actual trajectory
         decoded_traj = self.traj_decoder(planner_features)
@@ -253,9 +284,17 @@ class D3Nav(BaseModel):
         t = prompt.size(0)
         device = prompt.device
 
+        prompt = prompt.view(8, 129)
+
+        # prompt.shape: [1032]
+        # 8 frames
+        # Each frame is 129 tokens long
+
         # Single forward pass through transformer
         input_pos = torch.arange(0, t, device=device)
-        transformer_output = self.model(prompt.view(1, -1), input_pos)
+        transformer_output = self.model(
+            prompt.view(1, -1), input_pos, self.dropout_rate
+        )
 
         return transformer_output
 
@@ -490,12 +529,27 @@ class GPT(nn.Module):
         self,
         idx: Tensor,
         input_pos: Optional[Tensor] = None,
+        dropout_rate: float = 0.0,
     ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
         if input_pos is None:
             input_pos = torch.arange(idx.shape[1], device=idx.device)
 
         mask = self.causal_mask[:, :, input_pos]
         x = self.transformer.wte(idx) + self.transformer.wpe(input_pos)
+
+        if dropout_rate > 0.0:
+            # Droput for video frame tokens
+            # Reshape to separate frames: (1, 8, 129, 1024)
+            x = x.view(1, 8, 129, 1024)
+
+            # Apply dropout to entire frames
+            frame_mask = torch.bernoulli(
+                torch.ones(1, 8, 1, 1, device=idx.device) * (1 - dropout_rate)
+            )
+            x = x * frame_mask
+
+            # Reshape back: (1, 1032, 1024)
+            x = x.view(1, -1, 1024)
 
         for layer_index, layer in enumerate(self.transformer.h):
             x = layer(x, input_pos, mask)

@@ -12,7 +12,7 @@ from d3nav.scripts.train_traj import D3NavTrainingModule
 from d3nav.visual import visualize_frame_img
 
 
-def process_frame(frame, model, frame_history):
+def process_frame(frame, model, frame_history, fps):
     """Process a single frame through the D3Nav model."""
     # Resize frame to model input size
     frame_resized = cv2.resize(frame, (256, 128))
@@ -21,11 +21,11 @@ def process_frame(frame, model, frame_history):
     frame_rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
 
     # Convert to tensor and normalize
-    frame_tensor = torch.from_numpy(frame_rgb).float() / 255.0
+    frame_tensor = torch.from_numpy(frame_rgb).float()
     frame_tensor = frame_tensor.permute(2, 0, 1)  # (H,W,C) -> (C,H,W)
 
     # Sample 8 frames at 2 FPS from the history
-    if len(frame_history) >= 8:
+    if len(frame_history) >= int(4.5 * fps):
         # Convert all frames in history to tensors
         history_tensors = []
         step = len(frame_history) // 8
@@ -43,6 +43,7 @@ def process_frame(frame, model, frame_history):
         sequence = torch.stack(history_tensors)
         sequence = sequence.unsqueeze(0).cuda()  # Add batch dimension
     else:
+        print("no temporal")
         # Fallback to repeating current frame if not enough history
         sequence = frame_tensor.unsqueeze(0).repeat(8, 1, 1, 1)
         sequence = sequence.unsqueeze(0).cuda()
@@ -68,7 +69,7 @@ def main():
     parser.add_argument(
         "--ckpt",
         type=str,
-        default="checkpoints/d3nav/d3nav-epoch-03-val_loss-0.7735.ckpt",
+        default="checkpoints/d3nav/d3nav-epoch-15-val_loss-0.6955.ckpt",
         help="Path to checkpoint",
     )
     args = parser.parse_args()
@@ -91,29 +92,51 @@ def main():
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    # Calculate buffer size for 4.5 seconds of video
-    buffer_size = int(4.5 * fps)
+    # Calculate buffer size for 5 seconds of video
+    buffer_size = int(5 * fps)
+    buffer_full = int(4.5 * fps)
     frame_history = deque(maxlen=buffer_size)
+
+    print("buffer_size", buffer_size)
 
     # Initialize video writer
     video_writer = None
 
+    center_crop = 0.2
+
+    model.model.dropout_rate = 0.0
+
     try:
-        for _ in range(fps * 5):
+        for _ in range(fps * 30):
             ret, frame = cap.read()
         # Process frames
-        for _ in tqdm(range(frame_count), desc="Processing frames"):
+        for index in tqdm(range(frame_count), desc="Processing frames"):
             ret, frame = cap.read()
             if not ret:
                 break
-            
-            frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+
+            # frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+            h, w, _ = frame.shape
+            hs, ws = int(h * center_crop / 2), int(w * center_crop / 2)
+            he, we = int(hs + h * (1 - center_crop)), int(
+                ws + w * (1 - center_crop)
+            )
+
+            he = h
+            hs = int(2 * hs)
+
+            frame = frame[hs:he, ws:we]
+            frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
+            print("frame", frame.shape)
 
             # Add current frame to history
             frame_history.append(frame.copy())
 
+            if len(frame_history) < buffer_full:
+                continue
+
             # Get trajectory prediction
-            trajectory = process_frame(frame, model, frame_history)
+            trajectory = process_frame(frame, model, frame_history, fps)
 
             # Create visualization
             img_vis, img_bev = visualize_frame_img(
@@ -139,6 +162,9 @@ def main():
 
             # Combine camera view and BEV horizontally
             final_vis = np.hstack([img_vis, img_bev])
+
+            if index % 15 == 0:
+                cv2.imwrite("vis/vis.png", final_vis)
 
             # Initialize video writer if not already done
             if video_writer is None:
