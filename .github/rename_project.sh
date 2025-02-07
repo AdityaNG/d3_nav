@@ -19,7 +19,7 @@ echo "Renaming project..."
 original_author="AdityaNG"
 original_name="d3nav"
 original_urlname="d3nav"
-original_description="Awesome d3nav created by AdityaNG"
+original_description="D³Nav: Data-Driven Driving Agents for Autonomous Vehicles in Unstructured Traffic"
 # for filename in $(find . -name "*.*") 
 for filename in $(git ls-files) 
 do
