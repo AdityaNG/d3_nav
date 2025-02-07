@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="description" content="None" />
+      <link rel="shortcut icon" href="img/favicon.ico" />
+    <title>d3_nav</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "d3nav";
+        var mkdocs_page_input_path = "index.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="." class="icon icon-home"> d3_nav
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="./search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">d3nav</a>
+    <ul class="current">
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING/">How to develop on this project</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="EXPERIMENTS/">D3Nav v2 Experiemtns</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href=".">d3_nav</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">d3nav</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="d3nav">d3nav</h1>
+<p><a href="https://codecov.io/gh/AdityaNG/d3nav"><img alt="codecov" src="https://codecov.io/gh/AdityaNG/d3nav/branch/main/graph/badge.svg?token=D3Nav_token_here" /></a>
+<a href="https://github.com/AdityaNG/d3nav/actions/workflows/main.yml"><img alt="CI" src="https://github.com/AdityaNG/d3nav/actions/workflows/main.yml/badge.svg" /></a>
+<a href="https://github.com/AdityaNG/d3nav/blob/main/LICENSE"><img alt="GitHub License" src="https://img.shields.io/github/license/AdityaNG/d3nav" /></a>
+<a href="https://pypi.org/project/d3nav/"><img alt="PyPI - Version" src="https://img.shields.io/pypi/v/d3nav" /></a>
+<img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/d3nav" /></p>
+<p>D³Nav: Data-Driven Driving Agents for Autonomous Vehicles in Unstructured Traffic.</p>
+<p>This repo is my implementation of D3Nav using CommaAI's video world model, fine tuning it using the D3Nav methodology on NuScenes.</p>
+<p><img src="https://github.com/AdityaNG/d3_nav/raw/main/media/arch.png" width="50%" /></p>
+<p><img alt="https://github.com/AdityaNG/d3_nav/raw/main/media/DEMO_0_future_video_prediction.mp4.gif" src="https://github.com/AdityaNG/d3_nav/raw/main/media/DEMO_0_future_video_prediction.mp4.gif" /></p>
+<p><b>Abstract</b> Navigating unstructured traffic autonomously requires handling a plethora of edge cases, traditionally challenging for perception and path-planning modules due to scarce real-world data and simulator limitations. By employing the next-token prediction task, LLMs have demonstrated to have learned a world model. D³Nav bridges this gap by employing a quantized encoding to transform high-dimensional video data (Fx3x128x256) into compact integer embeddings (Fx128) which are fed into our world model. D³Nav's world model is trained on the next-video-frame prediction task and simultaneously predicts the desired driving signal. The architecture's compact nature enables real-time operation while adhering to stringent power constraints. D³Nav's training on diverse datasets featuring unstructured data results in the model's proficient prediction of both future video frames and the driving signal. We make use of automated labeling to generate importance masks accentuating pedestrians and vehicles to aid our encoding system in focusing on objects of interest. These capabilities are an improvement in end-to-end autonomous navigation systems, particularly in the context of unstructured traffic environments. Our contribution includes our driving agent D³Nav and our embeddings dataset of unstructured traffic. We make our code and dataset\footnote{Please refer to the supplementary material} public.</p>
+<h1 id="video-demos">Video Demos</h1>
+<p>Below is a demo of D³Nav generating video frames</p>
+<p><img alt="https://github.com/AdityaNG/d3_nav/raw/main/media/DEMO_1_video_generation.mp4.gif" src="https://github.com/AdityaNG/d3_nav/raw/main/media/DEMO_1_video_generation.mp4.gif" /></p>
+<p>Below is a demo of D³Nav generating the control signal (desired trajectory) on a subset of our dataset.
+Note that the point cloud and semantic segmentation are not generated by D³Nav and are only used to visualize the trajectory in 3D with respect to other objects.</p>
+<p><img alt="https://github.com/AdityaNG/d3_nav/raw/main/media/DEMO_3_control_signal_trajectory.mp4.gif" src="https://github.com/AdityaNG/d3_nav/raw/main/media/DEMO_3_control_signal_trajectory.mp4.gif" /></p>
+<h2 id="cite">Cite</h2>
+<p>Cite our work if you find it useful</p>
+<pre><code class="language-bibtex">@article{NG2024D3Nav,
+  title={D³Nav: Data-Driven Driving Agents for Autonomous Vehicles in Unstructured Traffic},
+  author={Aditya NG and Gowri Srinivas},
+  journal={The 35th British Machine Vision Conference (BMVC)},
+  year={2024},
+  url={https://bmvc2024.org/}
+}
+</code></pre>
+<h2 id="install-it-from-pypi">Install it from PyPI</h2>
+<pre><code class="language-bash">pip install d3nav
+</code></pre>
+<p>You can run the video demo as follows</p>
+<pre><code class="language-bash">python3 -m d3nav --video_path input_video.mp4
+</code></pre>
+<h2 id="usage">Usage</h2>
+<p>Following is an example usage of the planner. Look at <code>d3nav/cli.py</code> for more details.</p>
+<pre><code class="language-py">from d3nav import load_d3nav, center_crop, d3nav_transform_img, visualize_frame_img
+
+# Load the model
+model = load_d3nav(args.ckpt)
+model = model.cuda()
+model.eval()
+
+# Create a buffer of 5 seconds
+buffer_size = int(5 * fps)
+buffer_full = int(4.5 * fps)
+frame_history = deque(maxlen=buffer_size)
+
+# Load a video and populate the buffer
+for index in tqdm(range(frame_count), desc=&quot;Processing frames&quot;):
+    ret, frame = cap.read()
+    frame = center_crop(frame, crop_ratio)
+    frame_history.append(frame.copy())
+
+    if len(frame_history) &gt;= buffer_full:
+        break
+
+# Construct the input of 8 frames at FPS
+history_tensors = []
+step = len(frame_history) // 8
+for i in range(0, len(frame_history), step):
+    if len(history_tensors) &lt; 8:  # Ensure we only get 8 frames
+        frame = frame_history[i]
+        frame = d3nav_transform_img(frame)
+        frame_t = torch.from_numpy(frame)
+        history_tensors.append(frame_t)
+
+# Stack the tensors to create sequence
+sequence = torch.stack(history_tensors)
+sequence = sequence.unsqueeze(0).cuda()  # Add batch dimension
+
+# Get trajectory prediction
+with torch.no_grad():
+    trajectory = model(sequence)
+    trajectory = trajectory[0].cpu().numpy()  # Remove batch dimension
+
+# Process trajectory for visualization
+traj = trajectory[:, [1, 2, 0]]
+traj[:, 0] *= -1
+trajectory = np.vstack(([0, 0, 0], traj))  # Add origin point
+
+img_vis, img_bev = visualize_frame_img(
+    img=frame.copy(),
+    trajectory=trajectory,
+    color=(255, 0, 0),
+)
+</code></pre>
+<p>You can train on the comma dataset using the following script</p>
+<pre><code class="language-bash"># Train the VQ-VAE for trajectory encoding
+python3 -m d3nav.scripts.train_traj
+
+# Fine tune the video model for trajectory prediction
+python3 -m d3nav.scripts.train
+</code></pre>
+<h2 id="model-predictive-control">Model Predictive Control</h2>
+<p>Checkout our <a href="https://github.com/AdityaNG/model_predictive_control">Model Predictive Controller</a> for computing steering angle and acceleration.</p>
+<pre><code class="language-py"># TODO: implement MPC to show steering
+# pip install model_predictive_control
+
+import numpy as np
+
+from model_predictive_control.cost.trajectory2d_steering_penalty import (
+    Traj2DSteeringPenalty,
+)
+from model_predictive_control.models.bicycle import (
+    BicycleModel,
+    BicycleModelParams,
+)
+from model_predictive_control.mpc import MPC
+
+# Initialize the Bicycle Model
+params = BicycleModelParams(
+    time_step=time_step,
+    steering_ratio=13.27,
+    wheel_base=2.83972,
+    speed_kp=1.0,
+    speed_ki=0.1,
+    speed_kd=0.05,
+    throttle_min=-1.0,
+    throttle_max=1.0,
+    throttle_gain=5.0,  # Max throttle corresponds to 5m/s^2
+)
+bicycle_model = BicycleModel(params)
+
+# Define the cost function
+cost = Traj2DSteeringPenalty(model=bicycle_model)
+
+# Initialize MPC Controller
+horizon = 20
+state_dim = 4  # (x, y, theta, velocity)
+controls_dim = 2  # (steering_angle, velocity)
+
+mpc = MPC(
+    model=bicycle_model,
+    cost=cost,
+    horizon=horizon,
+    state_dim=state_dim,
+    controls_dim=controls_dim,
+)
+
+# Define initial state (x, y, theta, velocity)
+start_state = [0.0, 0.0, 0.0, 1.0]
+
+# Define desired trajectory: moving in a straight line
+desired_state_sequence = [[i * 1.0, i * 0.5, 0.0, 1.0] for i in range(horizon)]
+
+# Initial control sequence: assuming zero steering and constant speed
+initial_control_sequence = [[0.0, 1.0] for _ in range(horizon)]
+
+# Define control bounds: steering_angle between -0.5 and 0.5 radians,
+bounds = [[(-np.deg2rad(400), np.deg2rad(400)), (-1.0, 1.0)] for _ in range(horizon)]
+
+# Optimize control inputs using MPC
+optimized_control_sequence = mpc.step(
+    start_state_tuple=start_state,
+    desired_state_sequence=desired_state_sequence,
+    initial_control_sequence=initial_control_sequence,
+    bounds=bounds,
+    max_iters=50,
+)
+</code></pre>
+<h2 id="development">Development</h2>
+<p>Read the <a href="CONTRIBUTING/">CONTRIBUTING.md</a> file.</p>
+<h1 id="getting-started">Getting Started</h1>
+<h2 id="docker-environment">Docker Environment</h2>
+<p>To build, use:</p>
+<pre><code class="language-bash">DOCKER_BUILDKIT=1 docker-compose build
+</code></pre>
+<p>To run the interactive shell, use:</p>
+<pre><code class="language-bash">docker-compose run dev
+</code></pre>
+<h2 id="future-video-prediction">Future Video Prediction</h2>
+<p><img alt="https://github.com/AdityaNG/d3_nav/raw/main/media/DEMO_0_future_video_prediction.mp4.gif" src="https://github.com/AdityaNG/d3_nav/raw/main/media/DEMO_0_future_video_prediction.mp4.gif" /></p>
+<p>D³Nav takes 6 frames as input context and produces the next 6 frames. In the prompt columns, we show the last frame of the input and on the Prediction column, we have an animation of D³Nav's prediction of what it thinks will happen next.</p>
+<h2 id="trajectory-demo">Trajectory Demo</h2>
+<p><img alt="https://github.com/AdityaNG/d3_nav/raw/main/media/DEMO_3_control_signal_trajectory.mp4.gif" src="https://github.com/AdityaNG/d3_nav/raw/main/media/DEMO_3_control_signal_trajectory.mp4.gif" /></p>
+<p>We have put together a demo video of D³Nav operating on a subset of our dataset. In the video, D³Nav takes the video frames as input and produces the control signal (desired trajectory) as output which is plotted out as a red strip on the 3D and 2D views. We have a parallel system which produces 3D semantic occupancy. The 3D semantic occupancy is not produced by D³Nav and is only plotted to help visualize the trajectory in 3D with respect to other objects. The semantics are highlighted in both the 2D and 3D views (Vehicles in Blue and Pedestrians in Red). All other objects are colored by a height map on the 3D view.</p>
+<p>The video is placed at <a href="https://github.com/AdityaNG/d3_nav/raw/main/media/DEMO_3_control_signal_trajectory.mp4">DEMO_3_control_signal_trajectory.mp4</a></p>
+<h2 id="dataset">Dataset</h2>
+<p>We have provided a subset of our dataset in the <a href="BengaluruDrivingEmbeddings/">BengaluruDrivingEmbeddings</a> folder for review. We have ensured that there is no personally identifyable information (faces, number plates, etc.) in our dataset.</p>
+<p>Dataset Structure</p>
+<pre><code class="language-bash">BengaluruDrivingEmbeddings/
+├── 1658384924059                       # Dataset ID
+│   ├── embeddings                      # Folder of embeddings
+│   ├── embeddings_features_quantized   # Folder of quantized embeddings
+│   ├── embeddings_index.npy            # Integer indices of the embeddings
+│   ├── input_video.mp4                 # Raw video
+│   └── reconstructed_video.mp4         # Video Reconstructed by VQ-VAE
+├── calibration                         # Camera Intrinsics
+│   ├── calibrationSession.mat
+│   ├── calib.txt
+│   └── calib.yaml
+└── weights                             # VQ-VAE weights
+    ├── decoder.onnx
+    ├── decoder.onnx.dynanic_quant.onnx
+    ├── decoder.pth
+    ├── encoder.onnx
+    ├── encoder.onnx.dynanic_quant.onnx
+    ├── encoder.pth
+    ├── quantizer_e_i_ts.npy
+    ├── quantizer.onnx
+    ├── quantizer.onnx.dynanic_quant.onnx
+    └── quantizer.pth
+</code></pre>
+<h1 id="acknowledgement">Acknowledgement</h1>
+<p>We would like to thank the authors of the following repositories</p>
+<ul>
+<li><a href="https://github.com/karpathy/minGPT">minGPT</a></li>
+<li><a href="https://github.com/luigifreda/pyslam">PySLAM</a></li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="CONTRIBUTING/" class="btn btn-neutral float-right" title="How to develop on this project">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+    
+      <span><a href="CONTRIBUTING/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = ".";</script>
+    <script src="js/theme_extra.js"></script>
+    <script src="js/theme.js"></script>
+      <script src="search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
+
+<!--
+MkDocs version : 1.6.1
+Build Date UTC : 2025-02-07 09:07:28.606071+00:00
+-->
