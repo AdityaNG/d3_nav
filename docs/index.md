@@ -254,10 +254,3 @@ BengaluruDrivingEmbeddings/
     ├── quantizer.onnx.dynanic_quant.onnx
     └── quantizer.pth
 ```
-
-# Acknowledgement
-
-We would like to thank the authors of the following repositories
-
- - [minGPT](https://github.com/karpathy/minGPT)
- - [PySLAM](https://github.com/luigifreda/pyslam)
