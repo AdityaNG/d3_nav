@@ -34,24 +34,24 @@ Key observations:
 
 ResNet: Pure ResNet regressing 6x2 trajectory
 
-![ResNet](media/runs/resnet_pure.png)
+![ResNet](https://github.com/AdityaNG/d3_nav/raw/main/media/runs/resnet_pure.png)
 
 ResNet-Traj: ResNet with frozen Trajectory Decoder
-![ResNet-Traj](media/runs/resnet_traj_decoder_frozen.png)
+![ResNet-Traj](https://github.com/AdityaNG/d3_nav/raw/main/media/runs/resnet_traj_decoder_frozen.png)
 
 ResNet-Traj-ft: ResNet with unfrozen Trajectory Decoder fine tuned
-![ResNet-Traj](media/runs/resnet_traj_decoder_unfrozen.png)
+![ResNet-Traj](https://github.com/AdityaNG/d3_nav/raw/main/media/runs/resnet_traj_decoder_unfrozen.png)
 
 # D3Nav
 
 [D3Nav-3L](https://wandb.ai/adityang/D3Nav-NuScenes/runs/hcnqal2v?nw=nwuseradityang): Unfrozen 3 Layers, single token, frozen Trajectory Decoder
-![D3Nav-3L](media/runs/D3Nav-3L.png)
+![D3Nav-3L](https://github.com/AdityaNG/d3_nav/raw/main/media/runs/D3Nav-3L.png)
 
 [D3Nav-3L-ft](https://wandb.ai/adityang/D3Nav-NuScenes/runs/czr85wgs?nw=nwuseradityang): Unfrozen 3 Layers, single token, unfrozen Trajectory Decoder
-![D3Nav-3L-ft](media/runs/D3Nav-3L-ft.png)
+![D3Nav-3L-ft](https://github.com/AdityaNG/d3_nav/raw/main/media/runs/D3Nav-3L-ft.png)
 
 [D3Nav-3L-ft-CA](https://wandb.ai/adityang/D3Nav-NuScenes/runs/fv05dza3?nw=nwuseradityang): Unfrozen 3 Layers, unfrozen Trajectory Decoder, chunked attention
-![D3Nav-3L-ft-CA](media/runs/D3Nav-3L-ft-CA.png)
+![D3Nav-3L-ft-CA](https://github.com/AdityaNG/d3_nav/raw/main/media/runs/D3Nav-3L-ft-CA.png)
 
 [D3Nav-3L-ft-CA-D0.2](https://wandb.ai/adityang/D3Nav-NuScenes/runs/fv05dza3?nw=nwuseradityang): Unfrozen 3 Layers, unfrozen Trajectory Decoder, chunked attention, with frame level dropout of 20%
-![D3Nav-3L-ft-CA-D0.2](media/runs/D3Nav-3L-ft-CA-D0.2.png)
+![D3Nav-3L-ft-CA-D0.2](https://github.com/AdityaNG/d3_nav/raw/main/media/runs/D3Nav-3L-ft-CA-D0.2.png)
