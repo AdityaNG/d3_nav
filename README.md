@@ -1,8 +1,8 @@
 # d3nav
 
-[![codecov](https://codecov.io/gh/AdityaNG/d3nav/branch/main/graph/badge.svg?token=D3Nav_token_here)](https://codecov.io/gh/AdityaNG/d3nav)
-[![CI](https://github.com/AdityaNG/d3nav/actions/workflows/main.yml/badge.svg)](https://github.com/AdityaNG/d3nav/actions/workflows/main.yml)
-[![GitHub License](https://img.shields.io/github/license/AdityaNG/d3nav)](https://github.com/AdityaNG/d3nav/blob/main/LICENSE)
+[![codecov](https://codecov.io/gh/AdityaNG/d3_nav/branch/main/graph/badge.svg?token=D3Nav_token_here)](https://codecov.io/gh/AdityaNG/d3nav)
+[![CI](https://github.com/AdityaNG/d3_nav/actions/workflows/main.yml/badge.svg)](https://github.com/AdityaNG/d3_nav/actions/workflows/main.yml)
+[![GitHub License](https://img.shields.io/github/license/AdityaNG/d3nav)](https://github.com/AdityaNG/d3_nav/blob/main/LICENSE)
 [![PyPI - Version](https://img.shields.io/pypi/v/d3nav)](https://pypi.org/project/d3nav/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/d3nav)
 

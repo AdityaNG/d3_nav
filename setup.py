@@ -33,7 +33,7 @@ setup(
     name="d3nav",
     version=read("d3nav", "VERSION"),
     description="Awesome d3nav created by AdityaNG",
-    url="https://github.com/AdityaNG/d3nav/",
+    url="https://github.com/AdityaNG/d3_nav/",
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
     author="AdityaNG",
