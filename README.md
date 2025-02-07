@@ -51,21 +51,64 @@ pip install d3nav
 
 You can run the video demo as follows
 ```bash
-# TODO:
 python3 -m d3nav --video_path input_video.mp4
 ```
 
 ## Usage
 
-Download our [checkpoints from google drive](https://drive.google.com/drive/u/0/folders/18o7e1UnpvNmO3sZD7J_x9xjG9IW9g8QK)
+Following is an example usage of the planner. Look at `d3nav/cli.py` for more details.
 
 ```py
-from d3nav.model import D3Nav
+from d3nav import load_d3nav, center_crop, d3nav_transform_img, visualize_frame_img
 
 # Load the model
-net = D3Nav()
-net.load_state_dict(torch.load(d3nav_path))
-net.eval()
+model = load_d3nav(args.ckpt)
+model = model.cuda()
+model.eval()
+
+# Create a buffer of 5 seconds
+buffer_size = int(5 * fps)
+buffer_full = int(4.5 * fps)
+frame_history = deque(maxlen=buffer_size)
+
+# Load a video and populate the buffer
+for index in tqdm(range(frame_count), desc="Processing frames"):
+    ret, frame = cap.read()
+    frame = center_crop(frame, crop_ratio)
+    frame_history.append(frame.copy())
+
+    if len(frame_history) >= buffer_full:
+        break
+
+# Construct the input of 8 frames at FPS
+history_tensors = []
+step = len(frame_history) // 8
+for i in range(0, len(frame_history), step):
+    if len(history_tensors) < 8:  # Ensure we only get 8 frames
+        frame = frame_history[i]
+        frame = d3nav_transform_img(frame)
+        frame_t = torch.from_numpy(frame)
+        history_tensors.append(frame_t)
+
+# Stack the tensors to create sequence
+sequence = torch.stack(history_tensors)
+sequence = sequence.unsqueeze(0).cuda()  # Add batch dimension
+
+# Get trajectory prediction
+with torch.no_grad():
+    trajectory = model(sequence)
+    trajectory = trajectory[0].cpu().numpy()  # Remove batch dimension
+
+# Process trajectory for visualization
+traj = trajectory[:, [1, 2, 0]]
+traj[:, 0] *= -1
+trajectory = np.vstack(([0, 0, 0], traj))  # Add origin point
+
+img_vis, img_bev = visualize_frame_img(
+    img=frame.copy(),
+    trajectory=trajectory,
+    color=(255, 0, 0),
+)
 ```
 
 You can train on the comma dataset using the following script
@@ -165,28 +208,6 @@ To run the interactive shell, use:
 docker-compose run dev
 ```
 
-## Download Weights and Dataset
-
-Download [weights](https://drive.google.com/file/d/1Y78qFoH_kDuyD3PMjHoNRb7cva2aebCC/view?usp=sharing) and place it at "./weights/"
-Download a subset of our [dataset](https://drive.google.com/file/d/1LJFj0C1JQpLKXi9LxDRe_ivvc058vD09/view?usp=sharing) and place it at "./BengaluruDrivingEmbeddings/"
-
-## Train
-
-Train D³Nav on the Embeddings dataset using:
-```bash
-python3 -m d3nav.scripts.train_GPT
-```
-
-The training script will produce visuals and metrics and push them to weights and biases
-
-
-## Training on Comma VQ Dataset
-
-```bash
-cd ~/Datasets
-git lfs clone https://huggingface.co/commaai/commavq-gpt2m
-git lfs clone https://huggingface.co/datasets/commaai/commavq
-```
 
 ## Future Video Prediction
 

@@ -8,49 +8,35 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from d3nav.scripts.train_traj import D3NavTrainingModule
+from d3nav.factory import load_d3nav
+from d3nav.model.d3nav import center_crop, d3nav_transform_img
 from d3nav.visual import visualize_frame_img
 
 
 def process_frame(frame, model, frame_history, fps):
     """Process a single frame through the D3Nav model."""
-    # Resize frame to model input size
-    frame_resized = cv2.resize(frame, (256, 128))
-
-    # Convert BGR to RGB
-    frame_rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
-
-    # Convert to tensor and normalize
-    frame_tensor = torch.from_numpy(frame_rgb).float()
-    frame_tensor = frame_tensor.permute(2, 0, 1)  # (H,W,C) -> (C,H,W)
 
     # Sample 8 frames at 2 FPS from the history
-    if len(frame_history) >= int(4.5 * fps):
-        # Convert all frames in history to tensors
-        history_tensors = []
-        step = len(frame_history) // 8
-        for i in range(0, len(frame_history), step):
-            if len(history_tensors) < 8:  # Ensure we only get 8 frames
-                frame = frame_history[i]
-                # Resize and convert to tensor
-                frame = cv2.resize(frame, (256, 128))
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame_t = torch.from_numpy(frame).float() / 255.0
-                frame_t = frame_t.permute(2, 0, 1)
-                history_tensors.append(frame_t)
+    assert len(frame_history) >= int(4.5 * fps)
 
-        # Stack the tensors to create sequence
-        sequence = torch.stack(history_tensors)
-        sequence = sequence.unsqueeze(0).cuda()  # Add batch dimension
-    else:
-        print("no temporal")
-        # Fallback to repeating current frame if not enough history
-        sequence = frame_tensor.unsqueeze(0).repeat(8, 1, 1, 1)
-        sequence = sequence.unsqueeze(0).cuda()
+    # Convert all frames in history to tensors
+    history_tensors = []
+    step = len(frame_history) // 8
+    for i in range(0, len(frame_history), step):
+        if len(history_tensors) < 8:  # Ensure we only get 8 frames
+            frame = frame_history[i]
+            # Resize and convert to tensor
+            frame = d3nav_transform_img(frame)
+            frame_t = torch.from_numpy(frame)
+            history_tensors.append(frame_t)
+
+    # Stack the tensors to create sequence
+    sequence = torch.stack(history_tensors)
+    sequence = sequence.unsqueeze(0).cuda()  # Add batch dimension
 
     # Get trajectory prediction
     with torch.no_grad():
-        trajectory = model.model(sequence)
+        trajectory = model(sequence)
         trajectory = trajectory[0].cpu().numpy()  # Remove batch dimension
 
     # Process trajectory for visualization
@@ -69,7 +55,7 @@ def main():
     parser.add_argument(
         "--ckpt",
         type=str,
-        default="checkpoints/d3nav/d3nav-epoch-15-val_loss-0.6955.ckpt",
+        default="d3nav-epoch-15-val_loss-0.6955.ckpt",
         help="Path to checkpoint",
     )
     args = parser.parse_args()
@@ -80,7 +66,8 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     # Load model
-    model = D3NavTrainingModule.load_from_checkpoint(args.ckpt)
+    model = load_d3nav(args.ckpt)
+    model = model.cuda()
     model.eval()
 
     # Open video file
@@ -102,9 +89,9 @@ def main():
     # Initialize video writer
     video_writer = None
 
-    center_crop = 0.2
+    crop_ratio = 0.3
 
-    model.model.dropout_rate = 0.0
+    model.dropout_rate = 0.0
 
     try:
         for _ in range(fps * 30):
@@ -115,19 +102,8 @@ def main():
             if not ret:
                 break
 
-            # frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
-            h, w, _ = frame.shape
-            hs, ws = int(h * center_crop / 2), int(w * center_crop / 2)
-            he, we = int(hs + h * (1 - center_crop)), int(
-                ws + w * (1 - center_crop)
-            )
-
-            he = h
-            hs = int(2 * hs)
-
-            frame = frame[hs:he, ws:we]
+            frame = center_crop(frame, crop_ratio)
             frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
-            print("frame", frame.shape)
 
             # Add current frame to history
             frame_history.append(frame.copy())

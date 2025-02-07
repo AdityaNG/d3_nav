@@ -7,7 +7,7 @@ import torch
 from nuscenes.nuscenes import NuScenes
 
 from d3nav.datasets.nusc import NuScenesDataset
-from d3nav.scripts.train_traj import D3NavTrainingModule
+from d3nav.model.trainer import D3NavTrajTrainingModule
 from d3nav.visual import visualize_frame_img
 
 
@@ -54,7 +54,7 @@ def main():
     print(camera_intrinsic)
 
     # Load model
-    model = D3NavTrainingModule.load_from_checkpoint(args.ckpt)
+    model = D3NavTrajTrainingModule.load_from_checkpoint(args.ckpt)
     model.eval()
 
     # Create dataset

@@ -8,9 +8,9 @@ This instructions are for linux base systems. (Linux, MacOS, BSD, etc.)
 ## Setting up your own fork of this repo.
 
 - On github interface click on `Fork` button.
-- Clone your fork of this repo. `git clone git@github.com:YOUR_GIT_USERNAME/d3nav.git`
-- Enter the directory `cd d3nav`
-- Add upstream repo `git remote add upstream https://github.com/AdityaNG/d3nav`
+- Clone your fork of this repo. `git clone git@github.com:YOUR_GIT_USERNAME/d3_nav.git`
+- Enter the directory `cd d3_nav`
+- Add upstream repo `git remote add upstream https://github.com/AdityaNG/d3_nav`
 
 ## Setting up your own virtual environment
 

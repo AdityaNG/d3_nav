@@ -48,7 +48,7 @@ class D3NavTrainingModule(pl.LightningModule):
         self.model = D3Nav()
         self.metric = PlanningMetric()
 
-        self.model.dropout_rate = 0.2
+        self.model.dropout_rate = 0.0  # frame level dropout
         self.model.freeze_traj_dec(
             requires_grad=traj_requires_grad,
         )

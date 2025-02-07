@@ -10,7 +10,7 @@ from nuscenes.nuscenes import NuScenes
 from tqdm import tqdm
 
 from d3nav.datasets.nusc import NuScenesDataset
-from d3nav.scripts.train_traj import D3NavTrainingModule
+from d3nav.model.trainer import D3NavTrajTrainingModule
 from d3nav.visual import visualize_frame_img
 
 
@@ -55,7 +55,11 @@ def main():
     # ckpt = "checkpoints/d3nav/d3nav-epoch-15-val_loss-0.7631.ckpt"  # 3 layers, avg pool, cumulative, traj unfrozen, from scratch  # noqa
     # Learns turning, l2 (1s) of 0.67041
 
-    ckpt = "checkpoints/d3nav/d3nav-epoch-15-val_loss-0.6955.ckpt"  # 3 layers, ChunkedAttention, cumulative, traj unfrozen, from scratch  # noqa
+    # ckpt = "checkpoints/d3nav/d3nav-epoch-15-val_loss-0.6955.ckpt"  # 3 layers, ChunkedAttention, cumulative, traj unfrozen, from scratch  # noqa
+    # Good turning, improves upon metrics
+
+    ckpt = "checkpoints/d3nav/d3nav-epoch-10-val_loss-0.9685.ckpt"  # Dropout 0.2, 3 layers, ChunkedAttention, cumulative, traj unfrozen, from scratch  # noqa
+    # Frame level Dropout rate was too agressive
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -78,8 +82,12 @@ def main():
     print(camera_intrinsic)
 
     # Load model
-    model = D3NavTrainingModule.load_from_checkpoint(args.ckpt)
+    model = D3NavTrajTrainingModule.load_from_checkpoint(args.ckpt)
     model.eval()
+
+    # from ..factory import load_d3nav
+    # model = load_d3nav(args.ckpt)
+    # model.eval()
 
     # Create dataset
     dataset = NuScenesDataset(

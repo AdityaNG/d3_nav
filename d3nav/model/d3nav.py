@@ -109,36 +109,41 @@ class D3Nav(BaseModel):
 
     def __init__(
         self,
+        load_comma: bool = True,
     ):
         super(D3Nav, self).__init__()
 
         # Load model GPT
         self.config_gpt = GPTConfig()
         model = GPT(self.config_gpt)
-        model.load_state_dict_from_url(
-            "https://huggingface.co/commaai/commavq-gpt2m/resolve/main/pytorch_model.bin",  # noqa
-            assign=True,
-        )
+        if load_comma:
+            model.load_state_dict_from_url(
+                "https://huggingface.co/commaai/commavq-gpt2m/resolve/main/pytorch_model.bin",  # noqa
+                assign=True,
+            )
         self.model = model.to(dtype=DEFAULT_DATATYPE)
 
         # Load image decoder
         self.config_decoder = CompressorConfig()
         with torch.device("meta"):
             decoder = Decoder(self.config_decoder)
-            decoder.load_state_dict_from_url(
-                "https://huggingface.co/commaai/commavq-gpt2m/resolve/main/decoder_pytorch_model.bin",  # noqa
-                assign=True,
-            )
+            if load_comma:
+                decoder.load_state_dict_from_url(
+                    "https://huggingface.co/commaai/commavq-gpt2m/resolve/main/decoder_pytorch_model.bin",  # noqa
+                    assign=True,
+                )
         self.decoder = decoder
 
         # Load image encoder
         self.config_encoder = CompressorConfig()
+
         with torch.device("meta"):
             encoder = Encoder(self.config_encoder)
-            encoder.load_state_dict_from_url(
-                "https://huggingface.co/commaai/commavq-gpt2m/resolve/main/encoder_pytorch_model.bin",  # noqa
-                assign=True,
-            )
+            if load_comma:
+                encoder.load_state_dict_from_url(
+                    "https://huggingface.co/commaai/commavq-gpt2m/resolve/main/encoder_pytorch_model.bin",  # noqa
+                    assign=True,
+                )
 
         self.encoder = encoder
         self.T: int = 8
@@ -535,7 +540,9 @@ class GPT(nn.Module):
             input_pos = torch.arange(idx.shape[1], device=idx.device)
 
         mask = self.causal_mask[:, :, input_pos]
-        x = self.transformer.wte(idx) + self.transformer.wpe(input_pos)
+        wte_e = self.transformer.wte(idx)  # type: ignore
+        wpe_e = self.transformer.wpe(input_pos)  # type: ignore
+        x = wte_e + wpe_e
 
         if dropout_rate > 0.0:
             # Droput for video frame tokens
@@ -551,9 +558,11 @@ class GPT(nn.Module):
             # Reshape back: (1, 1032, 1024)
             x = x.view(1, -1, 1024)
 
-        for layer_index, layer in enumerate(self.transformer.h):
+        for layer_index, layer in enumerate(
+            self.transformer.h  # type: ignore
+        ):
             x = layer(x, input_pos, mask)
-        x = self.transformer.ln_f(x)
+        x = self.transformer.ln_f(x)  # type: ignore
         logits = self.lm_head(x)
 
         return logits
@@ -1172,6 +1181,32 @@ def transform_img(
     return cv2.resize(frame, output_size)
 
 
+def d3nav_transform_img(frame: np.ndarray):
+    """
+    Accepts a CV2 image as input and transforms it to D3Nav input space
+    Returns a numpy float matrix
+    """
+    frame = cv2.resize(frame, (512, 256))
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame = transform_img(frame)
+    frame = np.transpose(frame, (2, 0, 1))
+    frame = frame.astype(np.float32)
+    return frame
+
+
+def center_crop(frame: np.ndarray, crop_ratio: float):
+    h, w, _ = frame.shape
+    hs, ws = int(h * crop_ratio / 2), int(w * crop_ratio / 2)
+    he, we = int(hs + h * (1 - crop_ratio)), int(ws + w * (1 - crop_ratio))
+
+    he = h
+    hs = int(2 * hs)
+
+    frame = frame[hs:he, ws:we]
+
+    return frame
+
+
 @torch.no_grad()
 def to_cv2_frame(img_torch: torch.Tensor) -> np.ndarray:
     img_np = img_torch.cpu().numpy()
@@ -1193,6 +1228,8 @@ if __name__ == "__main__":
     )  # Add requires_grad=True
     model = D3Nav()
     model.unfreeze_last_n_layers(num_layers=3)
+
+    print("x", x.shape, x.dtype, (x.min(), x.max()))
 
     traj = model(x)
 
