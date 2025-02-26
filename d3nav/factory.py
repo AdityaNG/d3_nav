@@ -7,11 +7,11 @@ from .model.d3nav import D3Nav
 
 gdrive_checkpoints = {
     "d3nav-epoch-07-val_loss-1.2325.ckpt": {
-        "dgrive_id": "TODO",
+        "dgrive_id": "1d13tdRXXJYjn6X609N7EkoCQrnV6MExu",
         "temporal_context": 1,
     },
     "d3nav-epoch-06-val_loss-0.7179.ckpt": {
-        "dgrive_id": "TODO",
+        "dgrive_id": "1QF7k_koebOgH9OGhBPuZTuxHVop16bIp",
         "temporal_context": 2,
     },
     "d3nav-epoch-15-val_loss-0.6955.ckpt": {
