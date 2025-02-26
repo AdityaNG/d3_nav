@@ -4,6 +4,13 @@ Changelog
 
 (unreleased)
 ------------
+- Feat(D3Nav-3L-ft-CA-T1): causal confusion points. [AdityaNG]
+- Docs(d3nav): names, license. [AdityaNG]
+
+
+0.1.0 (2025-02-07)
+------------------
+- Release: version 0.1.0 🚀 [AdityaNG]
 - Docs. [AdityaNG]
 - Update LICENSE. [Aditya]
 - Repo url rename. [AdityaNG]
