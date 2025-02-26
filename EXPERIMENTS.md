@@ -12,6 +12,8 @@ We run the following exeriments:
 | D3Nav-3L-ft | 0.76 | 1.4 | 2.0 | 0.3 | 0.8 |
 | D3Nav-3L-ft-CA | 0.66 | 1.2 | 1.8 | 0.2 | 0.7 |
 | D3Nav-3L-ft-CA-D0.2 | 1.00849 | 1.7547 | 2.5741 | 0.3725 | 0.96 |
+| D3Nav-3L-ft-CA-T2 | 0.71 | 1.25 | 1.867 | 0.26 | 0.71 |
+| D3Nav-3L-ft-CA-T1 | 1.417 | 2.37 | 3.35 | 0.1462 | 1.232 |
 
 Notes:
 - First we pretrain our `TrajectoryEncoder` and `TrajectoryDecoder` on the task of trajectory reconstruction. We use these latents as an interface for our models to predict trajectory.
@@ -22,13 +24,16 @@ Notes:
 - D3Nav-3L-ft: Taking our learnings from the baseline experiment, we unfreeze the trajectory decoder, this improves the performance drastically as the backbone is no longer bottlenecked by its ability to interface with the frozen trajectory decoder. This brings us to L2 (1s) pf 0.76
 - D3Nav-3L-ft-CA: in order to reduce the load on the single token predicting the trajectory, we use the entire last layer of the transformer and we apply `ChunkedAttention`. This further improves our performance to L2 (1s) of 0.66
 - D3Nav-3L-ft-CA-D0.2: then we apply dropout to the inputs to help the model generalize further, but this dropout might have been too agressive. We have put this on pause for now (future work)
-
+- Causal Confusion: the temporal models of 8 frames seem to be cheating by interpolating the past ego motion to infer the desired trajectory. We now try a 2 frame and single frame model to verify this hypothesis:
+    - D3Nav-3L-ft-CA-T2: Gets a low L2 of 0.71, indicating that all the 8 frames are not needed for causal confusion in such a model. The behaviour still seems to indicate that the model is cheating
+    - D3Nav-3L-ft-CA-T1: When we remove all temporal context, the model finally stops cheating. However, the L2 loss shoots up to 1.4. We should look into addressing causal confusion by training our planner to work regardless of the number of frames we provide to the transformer as input.
 
 Key observations:
 1. D3Nav outperforms the ResNet baseline
 2. Adding the trajectory decoder (ResNet-Traj) significantly improves performance
 3. The D3Nav variants show progressive improvements
 4. D3Nav-3L-ft-CA-D0.2 dropout rate was too agressive
+5. Input dropout doesn't work, we will have to alter the training pipeline to simply not feed in temporal context as input.
 
 ## Baseline ResNet-34
 
@@ -55,3 +60,9 @@ ResNet-Traj-ft: ResNet with unfrozen Trajectory Decoder fine tuned
 
 [D3Nav-3L-ft-CA-D0.2](https://wandb.ai/adityang/D3Nav-NuScenes/runs/fv05dza3?nw=nwuseradityang): Unfrozen 3 Layers, unfrozen Trajectory Decoder, chunked attention, with frame level dropout of 20%
 ![D3Nav-3L-ft-CA-D0.2](https://github.com/AdityaNG/d3_nav/raw/main/media/runs/D3Nav-3L-ft-CA-D0.2.png)
+
+[D3Nav-3L-ft-CA-T2](https://wandb.ai/adityang/D3Nav-NuScenes/runs/w1e3j3yn): Unfrozen 3 Layers, unfrozen Trajectory Decoder, chunked attention, with frame level dropout of 20%, 2 temporal frames, trying to address the causal confusion, not much luck, even only 2 frames causes it to cheat
+![D3Nav-3L-ft-CA-T2](https://github.com/AdityaNG/d3_nav/raw/main/media/runs/D3Nav-3L-ft-CA-T2.png)
+
+[D3Nav-3L-ft-CA-T1](https://wandb.ai/adityang/D3Nav-NuScenes/runs/w1e3j3yn): Unfrozen 3 Layers, unfrozen Trajectory Decoder, chunked attention, with frame level dropout of 20%, 1 frames only, addressed the causal confusion
+![D3Nav-3L-ft-CA-T1](https://github.com/AdityaNG/d3_nav/raw/main/media/runs/D3Nav-3L-ft-CA-T1.png)

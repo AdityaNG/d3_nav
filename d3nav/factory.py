@@ -6,8 +6,22 @@ import torch
 from .model.d3nav import D3Nav
 
 gdrive_checkpoints = {
-    "d3nav-epoch-15-val_loss-0.6955.ckpt": "1BIuW3Ler_AcpZPStRolIX4c52zZdTO2k",
-    "d3nav-epoch-10-val_loss-0.9685.ckpt": "1PWwl3BOLJAQnknB4W06di4GVyaV9H2np",
+    "d3nav-epoch-07-val_loss-1.2325.ckpt": {
+        "dgrive_id": "TODO",
+        "temporal_context": 1,
+    },
+    "d3nav-epoch-06-val_loss-0.7179.ckpt": {
+        "dgrive_id": "TODO",
+        "temporal_context": 2,
+    },
+    "d3nav-epoch-15-val_loss-0.6955.ckpt": {
+        "dgrive_id": "1BIuW3Ler_AcpZPStRolIX4c52zZdTO2k",
+        "temporal_context": 8,
+    },
+    "d3nav-epoch-10-val_loss-0.9685.ckpt": {
+        "dgrive_id": "1PWwl3BOLJAQnknB4W06di4GVyaV9H2np",
+        "temporal_context": 8,
+    },
 }
 
 
@@ -18,7 +32,10 @@ def load_d3nav(ckpt_path: str = list(gdrive_checkpoints.keys())[0]) -> D3Nav:
         print("D3Nav: Using downloaded checkpoint")
         cache_dir = os.path.expanduser("~/.cache/d3nav")
         os.makedirs(cache_dir, exist_ok=True)
-        gdrive_id = gdrive_checkpoints[ckpt_path]
+        gdrive_id = gdrive_checkpoints[ckpt_path]["dgrive_id"]
+        temporal_context = int(  # type: ignore
+            gdrive_checkpoints[ckpt_path]["temporal_context"]
+        )
 
         ckpt_path = os.path.join(cache_dir, ckpt_path)
 
@@ -33,7 +50,9 @@ def load_d3nav(ckpt_path: str = list(gdrive_checkpoints.keys())[0]) -> D3Nav:
     # Remove 'model.' prefix from all keys
     new_state_dict = {k[len("model.") :]: v for k, v in state_dict.items()}
 
-    model = D3Nav()
+    model = D3Nav(
+        temporal_context=temporal_context,
+    )
     model.load_state_dict(new_state_dict)
     model.eval()
 

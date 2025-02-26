@@ -110,6 +110,7 @@ class D3Nav(BaseModel):
     def __init__(
         self,
         load_comma: bool = True,
+        temporal_context: int = 8,
     ):
         super(D3Nav, self).__init__()
 
@@ -146,8 +147,7 @@ class D3Nav(BaseModel):
                 )
 
         self.encoder = encoder
-        self.T: int = 8
-        self.temporal_context: int = 1
+        self.T: int = temporal_context
 
         self.dropout_rate: float = 0.0
 
@@ -262,7 +262,7 @@ class D3Nav(BaseModel):
 
             zp_l.append(zp_i)
         zp: torch.Tensor = torch.stack(zp_l)
-        zp = zp.reshape(B, 1032, self.config_gpt.dim + 1)
+        zp = zp.reshape(B, 129 * self.T, self.config_gpt.dim + 1)
 
         # Chunked attention processing
         zp = self.chunked_attention(zp)  # (B, 1, 1025)
@@ -289,16 +289,17 @@ class D3Nav(BaseModel):
         t = prompt.size(0)
         device = prompt.device
 
-        prompt = prompt.view(8, 129)
+        prompt = prompt.view(self.T, 129)
 
         # prompt.shape: [1032]
-        # 8 frames
+        # self.T frames
         # Each frame is 129 tokens long
 
         # Single forward pass through transformer
         input_pos = torch.arange(0, t, device=device)
         transformer_output = self.model(
-            prompt.view(1, -1), input_pos, self.dropout_rate
+            prompt.view(1, -1),
+            input_pos,
         )
 
         return transformer_output
@@ -534,7 +535,6 @@ class GPT(nn.Module):
         self,
         idx: Tensor,
         input_pos: Optional[Tensor] = None,
-        dropout_rate: float = 0.0,
     ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
         if input_pos is None:
             input_pos = torch.arange(idx.shape[1], device=idx.device)
@@ -543,20 +543,6 @@ class GPT(nn.Module):
         wte_e = self.transformer.wte(idx)  # type: ignore
         wpe_e = self.transformer.wpe(input_pos)  # type: ignore
         x = wte_e + wpe_e
-
-        if dropout_rate > 0.0:
-            # Droput for video frame tokens
-            # Reshape to separate frames: (1, 8, 129, 1024)
-            x = x.view(1, 8, 129, 1024)
-
-            # Apply dropout to entire frames
-            frame_mask = torch.bernoulli(
-                torch.ones(1, 8, 1, 1, device=idx.device) * (1 - dropout_rate)
-            )
-            x = x * frame_mask
-
-            # Reshape back: (1, 1032, 1024)
-            x = x.view(1, -1, 1024)
 
         for layer_index, layer in enumerate(
             self.transformer.h  # type: ignore

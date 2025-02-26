@@ -40,12 +40,13 @@ learning_rate = 5e-5 * math.sqrt(effective_batch_size / 24)
 
 num_layers = 3
 traj_requires_grad = True
+temporal_context = 1
 
 
 class D3NavTrainingModule(pl.LightningModule):
     def __init__(self):
         super().__init__()
-        self.model = D3Nav()
+        self.model = D3Nav(temporal_context=temporal_context)
         self.metric = PlanningMetric()
 
         self.model.dropout_rate = 0.0  # frame level dropout
@@ -202,8 +203,12 @@ def main():
     )
 
     # Create datasets and dataloaders
-    train_dataset = NuScenesDataset(nusc, is_train=True)
-    val_dataset = NuScenesDataset(nusc, is_train=False)
+    train_dataset = NuScenesDataset(
+        nusc, is_train=True, temporal_context=temporal_context
+    )
+    val_dataset = NuScenesDataset(
+        nusc, is_train=False, temporal_context=temporal_context
+    )
 
     train_loader = DataLoader(
         train_dataset,

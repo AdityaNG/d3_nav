@@ -55,7 +55,7 @@ def main():
     parser.add_argument(
         "--ckpt",
         type=str,
-        default="d3nav-epoch-15-val_loss-0.6955.ckpt",
+        default="checkpoints/d3nav/d3nav-epoch-06-val_loss-0.7179.ckpt",
         help="Path to checkpoint",
     )
     args = parser.parse_args()
@@ -68,6 +68,7 @@ def main():
     # Load model
     model = load_d3nav(args.ckpt)
     model = model.cuda()
+    model.temporal_context = 2
     model.eval()
 
     # Open video file

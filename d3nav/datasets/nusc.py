@@ -18,9 +18,11 @@ class NuScenesDataset(torch.utils.data.Dataset):
         is_train: bool = True,
         prediction_horizon: int = 6,
         fps: float = 2,
-        val_split=0.2,
+        val_split: float = 0.2,
+        temporal_context: int = 8,
     ):
         self.nusc = nusc
+        self.temporal_context = temporal_context
         self.is_train = is_train
         self.prediction_horizon = prediction_horizon
         self.fps = fps
@@ -52,10 +54,10 @@ class NuScenesDataset(torch.utils.data.Dataset):
             while sample_token:
                 sample = self.nusc.get("sample", sample_token)
 
-                # Get image paths for the last 8 frames
+                # Get image paths for the last self.temporal_context frames
                 image_paths = []
                 current_sample = sample
-                for _ in range(8):
+                for _ in range(self.temporal_context):
                     cam_front_data = self.nusc.get(
                         "sample_data", current_sample["data"]["CAM_FRONT"]
                     )
@@ -71,7 +73,7 @@ class NuScenesDataset(torch.utils.data.Dataset):
                         "sample", current_sample["prev"]
                     )
 
-                if len(image_paths) == 8:
+                if len(image_paths) == self.temporal_context:
                     # Get future trajectory
                     try:
                         future_xy = self._get_ego_future_trajectory(

@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 from d3nav.datasets.nusc import NuScenesDataset
 from d3nav.model.trainer import D3NavTrajTrainingModule
+from d3nav.scripts.train import temporal_context
 from d3nav.visual import visualize_frame_img
 
 
@@ -58,8 +59,17 @@ def main():
     # ckpt = "checkpoints/d3nav/d3nav-epoch-15-val_loss-0.6955.ckpt"  # 3 layers, ChunkedAttention, cumulative, traj unfrozen, from scratch  # noqa
     # Good turning, improves upon metrics
 
-    ckpt = "checkpoints/d3nav/d3nav-epoch-10-val_loss-0.9685.ckpt"  # Dropout 0.2, 3 layers, ChunkedAttention, cumulative, traj unfrozen, from scratch  # noqa
+    # ckpt = "checkpoints/d3nav/d3nav-epoch-10-val_loss-0.9685.ckpt"  # Dropout 0.2, 3 layers, ChunkedAttention, cumulative, traj unfrozen, from scratch  # noqa
     # Frame level Dropout rate was too agressive
+
+    # ckpt = "checkpoints/d3nav/d3nav-epoch-21-val_loss-1.5874.ckpt"  # 2 Frames only, random trajectory decoder, 3 layers, ChunkedAttention, cumulative, traj unfrozen, from scratch  # noqa
+    # Gets to L1 1s of 1.0, but trajectories look a little wonky
+
+    # ckpt = "checkpoints/d3nav/d3nav-epoch-06-val_loss-0.7179.ckpt"  # 2 Frames only, pretrained traj decoder, 3 layers, ChunkedAttention, cumulative, traj unfrozen, from scratch,   # noqa
+    # Gets to L1 1s of 0.75, trajectories are smoother
+
+    ckpt = "checkpoints/d3nav/d3nav-epoch-07-val_loss-1.2325.ckpt"  # 1 Frame only, pretrained traj decoder, 3 layers, ChunkedAttention, cumulative, traj unfrozen, from scratch,   # noqa
+    # Gets to L1 1s of 1.41
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -83,6 +93,7 @@ def main():
 
     # Load model
     model = D3NavTrajTrainingModule.load_from_checkpoint(args.ckpt)
+    model.model.T = temporal_context
     model.eval()
 
     # from ..factory import load_d3nav
@@ -95,6 +106,7 @@ def main():
         is_train=False,  # Use validation set for visualization
         prediction_horizon=6,
         fps=2,
+        temporal_context=temporal_context,
     )
 
     # Create output directory with timestamp
