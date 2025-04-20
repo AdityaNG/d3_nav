@@ -463,7 +463,7 @@ class Attention(nn.Module):
             mask = mask[:, :, :, :seqlen]
 
         y = F.scaled_dot_product_attention(
-            q, k, v, attn_mask=mask, dropout_p=0.0
+            q, k, v, is_causal=True, dropout_p=0.0
         )
         y = y.transpose(1, 2).contiguous().view(bsz, seqlen, self.config.dim)
         return self.c_proj(y)
