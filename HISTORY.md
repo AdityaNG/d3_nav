@@ -4,6 +4,13 @@ Changelog
 
 (unreleased)
 ------------
+- Version increment. [AdityaNG]
+- Fix(d3nav/model/d3nav.py): batch forward pass. [AdityaNG]
+
+
+0.3.0 (2025-02-26)
+------------------
+- Release: version 0.3.0 🚀 [AdityaNG]
 - Fix(factory) [AdityaNG]
 
 
