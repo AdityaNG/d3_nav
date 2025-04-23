@@ -4,6 +4,12 @@ Changelog
 
 (unreleased)
 ------------
+- Feat(model): attention dropout. [AdityaNG]
+
+
+0.4.0 (2025-04-20)
+------------------
+- Release: version 0.4.0 🚀 [AdityaNG]
 - Version increment. [AdityaNG]
 - Fix(d3nav/model/d3nav.py): batch forward pass. [AdityaNG]
 
