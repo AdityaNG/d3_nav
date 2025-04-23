@@ -111,11 +111,14 @@ class D3Nav(BaseModel):
         self,
         load_comma: bool = True,
         temporal_context: int = 8,
+        attention_dropout_p: float = 0.0,
     ):
         super(D3Nav, self).__init__()
 
         # Load model GPT
-        self.config_gpt = GPTConfig()
+        self.config_gpt = GPTConfig(
+            attention_dropout_p=attention_dropout_p,
+        )
         model = GPT(self.config_gpt)
         if load_comma:
             model.load_state_dict_from_url(
@@ -385,6 +388,7 @@ class GPTConfig:
     dim: int = 1024
     intermediate_size: int = 4 * 1024
     tokens_per_frame: int = 129
+    attention_dropout_p: float = 0.1
 
     @property
     def bos_token(self):
@@ -463,7 +467,7 @@ class Attention(nn.Module):
             mask = mask[:, :, :, :seqlen]
 
         y = F.scaled_dot_product_attention(
-            q, k, v, is_causal=True, dropout_p=0.0
+            q, k, v, is_causal=True, dropout_p=self.config.attention_dropout_p
         )
         y = y.transpose(1, 2).contiguous().view(bsz, seqlen, self.config.dim)
         return self.c_proj(y)
