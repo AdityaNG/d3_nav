@@ -4,6 +4,12 @@ Changelog
 
 (unreleased)
 ------------
+- Feat(d3nav_video): video model with proper backprop. [AdityaNG]
+
+
+0.5.0 (2025-04-23)
+------------------
+- Release: version 0.5.0 🚀 [AdityaNG]
 - Feat(model): attention dropout. [AdityaNG]
 
 
