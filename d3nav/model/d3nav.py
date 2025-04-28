@@ -151,6 +151,7 @@ class D3Nav(BaseModel):
 
         self.encoder = encoder
         self.T: int = temporal_context
+        self.temporal_context: int = temporal_context
 
         self.dropout_rate: float = 0.0
 
